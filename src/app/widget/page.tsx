@@ -6,6 +6,7 @@ interface WidgetPageProps {
     title?: string;
     welcome?: string;
     model?: string;
+    context?: string;
   }>;
 }
 
@@ -15,6 +16,7 @@ export default async function WidgetPage({ searchParams }: WidgetPageProps) {
   const title = params.title || "AI Asistan";
   const welcome = params.welcome || "Merhaba! Size nasıl yardımcı olabilirim?";
   const model = params.model || "";
+  const context = params.context || "";
 
   return (
     <WidgetChat
@@ -22,6 +24,7 @@ export default async function WidgetPage({ searchParams }: WidgetPageProps) {
       title={title}
       welcomeMessage={welcome}
       model={model}
+      context={context}
     />
   );
 }

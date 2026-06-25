@@ -15,9 +15,10 @@ interface WidgetChatProps {
   title: string;
   welcomeMessage: string;
   model: string;
+  context: string;
 }
 
-export function WidgetChat({ color, title, welcomeMessage, model }: WidgetChatProps) {
+export function WidgetChat({ color, title, welcomeMessage, model, context }: WidgetChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -78,6 +79,7 @@ export function WidgetChat({ color, title, welcomeMessage, model }: WidgetChatPr
           message: trimmed,
           sessionId,
           ...(model ? { model } : {}),
+          ...(context ? { context } : {}),
         }),
         signal: abortController.signal,
       });

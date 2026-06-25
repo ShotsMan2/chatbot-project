@@ -15,8 +15,15 @@
   "use strict";
 
   // Find the script tag to get config
-  var scripts = document.getElementsByTagName("script");
-  var currentScript = scripts[scripts.length - 1];
+  var currentScript = document.currentScript || (function() {
+    var scripts = document.getElementsByTagName("script");
+    for (var i = 0; i < scripts.length; i++) {
+      if (scripts[i].src && scripts[i].src.indexOf("embed.js") > -1) {
+        return scripts[i];
+      }
+    }
+    return scripts[scripts.length - 1];
+  })();
 
   var config = {
     color: currentScript.getAttribute("data-color") || "#6366f1",
@@ -26,6 +33,7 @@
       "Merhaba! Size nasıl yardımcı olabilirim?",
     position: currentScript.getAttribute("data-position") || "right",
     model: currentScript.getAttribute("data-model") || "",
+    context: currentScript.getAttribute("data-context") || "",
     serverUrl: currentScript.src.replace(/\/embed\.js.*$/, ""),
   };
 
@@ -78,7 +86,9 @@
     "&welcome=" +
     encodeURIComponent(config.welcome) +
     "&model=" +
-    encodeURIComponent(config.model);
+    encodeURIComponent(config.model) +
+    "&context=" +
+    encodeURIComponent(config.context);
 
   var iframe = document.createElement("iframe");
   iframe.id = "localmind-widget-frame";

@@ -26,10 +26,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, sessionId, model: requestedModel } = body as {
+    const { message, sessionId, model: requestedModel, context } = body as {
       message: string;
       sessionId?: string;
       model?: string;
+      context?: string;
     };
 
     if (!message || typeof message !== "string" || !message.trim()) {
@@ -74,6 +75,10 @@ export async function POST(req: NextRequest) {
             role: m.role as "system" | "user" | "assistant",
             content: m.content,
           }));
+
+        if (conv.systemPrompt) {
+          chatHistory.unshift({ role: "system", content: conv.systemPrompt });
+        }
       } else {
         convId = undefined; // session not found, create new
       }
@@ -81,12 +86,19 @@ export async function POST(req: NextRequest) {
 
     if (!convId) {
       convId = crypto.randomUUID();
+      let sysPrompt = "You are a helpful customer support assistant. Be concise and friendly. Answer in the same language as the user.";
+      if (context) {
+        sysPrompt += `\n\nUse the following information about the site/products to answer the user's questions:\n${context}`;
+      }
+
       await db.insert(conversations).values({
         id: convId,
         title: message.slice(0, 50) + "...",
         model,
-        systemPrompt: "You are a helpful customer support assistant. Be concise and friendly. Answer in the same language as the user.",
+        systemPrompt: sysPrompt,
       });
+      
+      chatHistory.unshift({ role: "system", content: sysPrompt });
     }
 
     // Add user message
