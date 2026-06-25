@@ -71,7 +71,7 @@ export function ChatContainer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          messages: newMessages.filter(m => m.content.trim()).map(m => ({ role: m.role, content: m.content })),
           conversationId,
         }),
         signal: abortController.signal

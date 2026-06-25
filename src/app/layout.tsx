@@ -17,7 +17,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let conversations = [];
+  let conversations: Awaited<ReturnType<typeof getConversations>> = [];
   try {
     conversations = await getConversations();
   } catch (e) {

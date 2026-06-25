@@ -32,7 +32,7 @@ export class OllamaProvider implements LlmProvider {
         throw new OllamaConnectionError();
       }
       const data = await response.json();
-      return data.models || [];
+      return (data.models || []).filter((m: any) => !m.name.includes("embed"));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         throw new OllamaConnectionError("Ollama connection timed out");
@@ -42,13 +42,6 @@ export class OllamaProvider implements LlmProvider {
   }
 
   async chat(input: ChatInput): Promise<ReadableStream<Uint8Array>> {
-    const models = await this.listModels();
-    const modelExists = models.some((m) => m.name === input.model);
-    
-    if (!modelExists) {
-      throw new ModelNotFoundError(input.model);
-    }
-
     try {
       const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
         method: "POST",
@@ -66,6 +59,9 @@ export class OllamaProvider implements LlmProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
+        if (response.status === 404 || errorText.toLowerCase().includes("not found")) {
+          throw new ModelNotFoundError(input.model);
+        }
         throw new OllamaResponseError(errorText);
       }
 

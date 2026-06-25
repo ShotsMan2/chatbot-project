@@ -36,7 +36,7 @@ export async function getSettings() {
     await db.insert(settings).values({ id: 1 }).execute();
     setting = await db.select().from(settings).where(eq(settings.id, 1)).get();
   }
-  return setting;
+  return setting!;
 }
 
 export async function updateSettings(data: Partial<typeof settings.$inferInsert>) {

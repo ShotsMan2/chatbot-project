@@ -62,7 +62,6 @@ export async function POST(req: NextRequest) {
         model,
         messages: chatMessages,
         options: { temperature, num_ctx: contextSize },
-        signal: req.signal, // Pass abort signal
       });
 
       // Intercept the stream to accumulate the response and save it to DB
@@ -161,6 +160,7 @@ export async function POST(req: NextRequest) {
       });
 
     } catch (error) {
+      console.error("[Chat API] Ollama error:", error);
       if (error instanceof ModelNotFoundError) {
         return NextResponse.json({ error: error.message, code: "MODEL_NOT_FOUND" }, { status: 404 });
       }
@@ -169,9 +169,10 @@ export async function POST(req: NextRequest) {
       }
       
       await db.update(messages).set({ status: "failed" }).where(eq(messages.id, assistantMessageId));
-      throw error;
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
     }
   } catch (error) {
+    console.error("[Chat API] Request error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

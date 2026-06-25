@@ -1,10 +1,11 @@
 import { ChatContainer } from "@/components/chat/chat-container";
 import { getSettings } from "@/lib/actions/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
+import { ModelInfo } from "@/lib/ollama/ollama-types";
 
 export default async function Home() {
   const settings = await getSettings();
-  let models = [];
+  let models: ModelInfo[] = [];
   let ollamaStatus: "ok" | "error" | "loading" = "ok";
   
   try {

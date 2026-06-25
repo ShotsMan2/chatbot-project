@@ -1,6 +1,7 @@
 import { ChatContainer, Message } from "@/components/chat/chat-container";
 import { getConversation, getMessages, getSettings } from "@/lib/actions/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
+import { ModelInfo } from "@/lib/ollama/ollama-types";
 import { notFound } from "next/navigation";
 
 export default async function ChatPage({ params }: { params: Promise<{ conversationId: string }> }) {
@@ -20,7 +21,7 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
   }));
 
   const settings = await getSettings();
-  let models = [];
+  let models: ModelInfo[] = [];
   let ollamaStatus: "ok" | "error" | "loading" = "ok";
   
   try {

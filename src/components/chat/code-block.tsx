@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getHighlighter, Highlighter } from "shiki";
+import { createHighlighter, type Highlighter } from "shiki";
 import { Button } from "@/components/ui/button";
 import { Check, Copy } from "lucide-react";
 
@@ -18,7 +18,7 @@ export function CodeBlock({ language, value }: CodeBlockProps) {
 
   useEffect(() => {
     if (!highlighterPromise) {
-      highlighterPromise = getHighlighter({
+      highlighterPromise = createHighlighter({
         themes: ["github-dark", "github-light"],
         langs: ["typescript", "javascript", "bash", "json", "html", "css", "python", "markdown"]
       });

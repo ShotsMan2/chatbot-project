@@ -30,11 +30,9 @@ export function Sidebar({ conversations }: SidebarProps) {
         <h2 className="font-semibold text-lg tracking-tight">LocalMind</h2>
       </div>
       <div className="p-4">
-        <Button asChild className="w-full justify-start gap-2" variant="default">
-          <Link href="/">
-            <PlusCircle className="h-4 w-4" />
-            New Chat
-          </Link>
+        <Button render={<Link href="/" />} nativeButton={false} className="w-full justify-start gap-2" variant="default">
+          <PlusCircle className="h-4 w-4" />
+          New Chat
         </Button>
       </div>
       <ScrollArea className="flex-1 px-4">
@@ -44,14 +42,13 @@ export function Sidebar({ conversations }: SidebarProps) {
             return (
               <div key={conv.id} className="relative group">
                 <Button
-                  asChild
+                  render={<Link href={`/chat/${conv.id}`} />}
+                  nativeButton={false}
                   variant={isActive ? "secondary" : "ghost"}
                   className="w-full justify-start pr-10 text-left font-normal truncate h-10"
                 >
-                  <Link href={`/chat/${conv.id}`}>
-                    <MessageSquare className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="truncate">{conv.title || "New Chat"}</span>
-                  </Link>
+                  <MessageSquare className="h-4 w-4 mr-2 shrink-0" />
+                  <span className="truncate">{conv.title || "New Chat"}</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -68,11 +65,9 @@ export function Sidebar({ conversations }: SidebarProps) {
         </div>
       </ScrollArea>
       <div className="p-4 border-t">
-        <Button asChild variant="ghost" className="w-full justify-start gap-2">
-          <Link href="/settings">
-            <Settings className="h-4 w-4" />
-            Settings
-          </Link>
+        <Button render={<Link href="/settings" />} nativeButton={false} variant="ghost" className="w-full justify-start gap-2">
+          <Settings className="h-4 w-4" />
+          Settings
         </Button>
       </div>
     </div>
