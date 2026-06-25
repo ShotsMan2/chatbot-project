@@ -58,28 +58,21 @@ export async function POST(req: NextRequest) {
     });
 
     try {
+      // Create our own AbortController to forward cancellation to Ollama
+      const ollamaAbort = new AbortController();
+
+      // If the client disconnects (req.signal aborts), abort Ollama too
+      const onClientAbort = () => ollamaAbort.abort();
+      req.signal.addEventListener("abort", onClientAbort, { once: true });
+
       const ollamaStream = await ollamaClient.chat({
         model,
         messages: chatMessages,
         options: { temperature, num_ctx: contextSize },
+        signal: ollamaAbort.signal,
       });
 
       // Intercept the stream to accumulate the response and save it to DB
-      const transformStream = new TransformStream({
-        start(controller) {
-          // You could optionally send an initial event to the client with the message ID
-        },
-        async transform(chunk, controller) {
-          controller.enqueue(chunk);
-          // Accumulation is handled in a separate async context or we do it here
-          // Since the stream chunks are Uint8Array of JSON strings + \n, we can decode and accumulate
-        },
-        async flush(controller) {
-          // Stream ended
-        }
-      });
-
-      // Actually, a cleaner way is to Tee the stream or wrap the reader.
       let accumulatedContent = "";
       let totalDuration = 0;
       let promptTokens = 0;
@@ -124,7 +117,6 @@ export async function POST(req: NextRequest) {
                     }
                   } catch (e) {
                     // ignore parse errors for partial chunks in the interceptor
-                    // The client will handle exact parsing
                   }
                 }
               }
@@ -144,9 +136,12 @@ export async function POST(req: NextRequest) {
             controller.error(error);
           } finally {
             reader.releaseLock();
+            req.signal.removeEventListener("abort", onClientAbort);
           }
         },
         cancel() {
+          // When the client disconnects / stream is cancelled, abort Ollama
+          ollamaAbort.abort();
           ollamaStream.cancel();
         }
       });
