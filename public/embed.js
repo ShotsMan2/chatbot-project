@@ -86,15 +86,25 @@
     "&welcome=" +
     encodeURIComponent(config.welcome) +
     "&model=" +
-    encodeURIComponent(config.model) +
-    "&context=" +
-    encodeURIComponent(config.context);
+    encodeURIComponent(config.model);
 
   var iframe = document.createElement("iframe");
   iframe.id = "localmind-widget-frame";
   iframe.src = widgetUrl;
   iframe.setAttribute("allow", "clipboard-write");
   iframe.setAttribute("title", config.title);
+
+  // Wait for widget to signal it's ready, then send the context securely
+  window.addEventListener("message", function(event) {
+    if (event.data && event.data.type === "localmind:ready") {
+      if (config.context) {
+        iframe.contentWindow.postMessage(
+          { type: "localmind:init_context", context: config.context },
+          "*"
+        );
+      }
+    }
+  });
 
   // ─── Toggle Logic ───
   btn.addEventListener("click", function () {

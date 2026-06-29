@@ -23,9 +23,24 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [localContext, setLocalContext] = useState(context);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "localmind:init_context" && event.data.context) {
+        setLocalContext(event.data.context);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+
+    // Notify parent that we are ready to receive the context
+    window.parent.postMessage({ type: "localmind:ready" }, "*");
+
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -82,7 +97,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
           message: trimmed,
           sessionId,
           ...(model ? { model } : {}),
-          ...(context ? { context } : {}),
+          ...(localContext ? { context: localContext } : {}),
         }),
         signal: abortController.signal,
       });
