@@ -204,11 +204,11 @@ export default function DemoPage() {
 
         {/* The actual widget embed */}
         <script
-          src="/embed.js?v=4"
-          data-color="#FF6000"
-          data-title="DemoShop Asistan"
+          src="/embed.js?v=5"
+          data-color="#1e293b"
+          data-title="DemoShop Kurumsal Destek"
           data-model="qwen2.5-coder:latest"
-          data-welcome="Merhaba! 👋 DemoShop'a hoş geldiniz. Ürünlerimiz, kargo durumu veya iade işlemleri hakkında size yardımcı olabilirim."
+          data-welcome="Değerli Müşterimiz, DemoShop'a hoş geldiniz. Size nasıl yardımcı olabilirim?"
           data-context="DemoShop E-Ticaret Sitesi. 
           
 **Satıştaki Ürünler:**
@@ -224,7 +224,12 @@ export default function DemoPage() {
 **Kampanyalar ve Kurallar:**
 - 500 TL üzeri alışverişlerde kargo bedava. Altında 39 TL.
 - Koşulsuz şartsız 15 gün iade hakkı mevcuttur.
-- Kapıda ödeme seçeneğimiz mevcuttur (ek 20 TL hizmet bedeli ile)."
+- Kapıda ödeme seçeneğimiz mevcuttur (ek 20 TL hizmet bedeli ile).
+
+**İletişim ve Mesai Saatleri:**
+- Çalışma Saatleri: Hafta içi 09:00 - 18:00
+- Destek E-postası: destek@demoshop.com
+- Çağrı Merkezi: 0850 123 45 67 (Sipariş iptali veya iade kodu gibi konularda yönlendiriniz)"
           data-position="right"
           defer
         />
