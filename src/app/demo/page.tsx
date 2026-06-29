@@ -204,12 +204,26 @@ export default function DemoPage() {
 
         {/* The actual widget embed */}
         <script
-          src="/embed.js?v=3"
-          data-color="#FF6000"
-          data-title="DemoShop Asistan"
+          src="/embed.js?v=8"
+          data-color="#1e293b"
+          data-title="DemoShop Kurumsal Destek"
           data-model="qwen2.5-coder:latest"
-          data-welcome="Merhaba! 👋 DemoShop'a hoş geldiniz. Ürünlerimiz, kargo durumu veya iade işlemleri hakkında size yardımcı olabilirim."
-          data-context="DemoShop E-Ticaret Sitesi. Satıştaki Ürünler ve Fiyatlar: 1) Spor Ayakkabı Siyah/Beyaz - 899 TL. 2) Deri El Çantası Premium - 1249 TL. 3) Akıllı Saat GPS Destekli - 2499 TL. 4) Kablosuz Kulaklık ANC - 1599 TL. 5) Telefon Kılıfı Şeffaf - 149 TL. 6) Kışlık Mont Su Geçirmez - 1899 TL. 7) Güneş Gözlüğü UV400 - 449 TL. 8) Laptop Sırt Çantası - 699 TL. Kargo bedava. İade süresi 15 gün."
+          data-welcome="Değerli Müşterimiz, DemoShop'a hoş geldiniz. Size nasıl yardımcı olabilirim?"
+          data-context="DemoShop E-Ticaret Sitesi. 
+          
+**Sistem Bilgisi:**
+- Kullanıcı herhangi bir ürün aradığında (ayakkabı, çanta vb.) sistem sana otomatik olarak ilgili ürünleri veritabanından çekip listeleyecektir.
+- Eğer henüz ürün bilgisi gelmediyse, kullanıcıya aradığı ürünü detaylandırmasını söyle (Örn: 'Kırmızı bir mont mu arıyorsunuz?').
+
+**Kampanyalar ve Kurallar:**
+- 500 TL üzeri alışverişlerde kargo bedava. Altında 39 TL.
+- Koşulsuz şartsız 15 gün iade hakkı mevcuttur.
+- Kapıda ödeme seçeneğimiz mevcuttur (ek 20 TL hizmet bedeli ile).
+
+**İletişim ve Mesai Saatleri:**
+- Çalışma Saatleri: Hafta içi 09:00 - 18:00
+- Destek E-postası: destek@demoshop.com
+- Çağrı Merkezi: 0850 123 45 67 (Sipariş iptali veya iade kodu gibi konularda yönlendiriniz)"
           data-position="right"
           defer
         />

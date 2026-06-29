@@ -23,9 +23,24 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [localContext, setLocalContext] = useState(context);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "localmind:init_context" && event.data.context) {
+        setLocalContext(event.data.context);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+
+    // Notify parent that we are ready to receive the context
+    window.parent.postMessage({ type: "localmind:ready" }, "*");
+
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,9 +57,17 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
     e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px";
   };
 
-  const handleSend = async () => {
-    const trimmed = input.trim();
+  const handleSend = async (textOverride?: string | React.MouseEvent | React.FormEvent) => {
+    const override = typeof textOverride === "string" ? textOverride : undefined;
+    const trimmed = (override || input).trim();
     if (!trimmed || isStreaming) return;
+
+    if (!override) {
+      setInput("");
+      if (inputRef.current) {
+        inputRef.current.style.height = "40px";
+      }
+    }
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -61,12 +84,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
     };
 
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setInput("");
     setIsStreaming(true);
-
-    if (inputRef.current) {
-      inputRef.current.style.height = "40px";
-    }
 
     const abortController = new AbortController();
     abortRef.current = abortController;
@@ -79,7 +97,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
           message: trimmed,
           sessionId,
           ...(model ? { model } : {}),
-          ...(context ? { context } : {}),
+          ...(localContext ? { context: localContext } : {}),
         }),
         signal: abortController.signal,
       });
@@ -181,11 +199,15 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
     <>
       {/* Header */}
       <div className="widget-header" style={{ background: color }}>
-        <div className="widget-header-avatar">AI</div>
+        <div className="widget-header-avatar">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 1c-5 0-9 4-9 9v7c0 1.66 1.34 3 3 3h3v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-4v8h4v1h-7v2h6c1.66 0 3-1.34 3-3V10c0-5-4-9-9-9z"/>
+          </svg>
+        </div>
         <div className="widget-header-info">
           <div className="widget-header-title">{title}</div>
           <div className="widget-header-status">
-            {isStreaming ? "Yazıyor..." : "Çevrimiçi"}
+            {isStreaming ? "Yanıtlanıyor..." : "Çevrimiçi"}
           </div>
         </div>
       </div>
@@ -195,10 +217,35 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
         {messages.length === 0 && (
           <div className="widget-welcome">
             <div className="widget-welcome-icon" style={{ background: color }}>
-              💬
+              <svg viewBox="0 0 24 24" style={{ width: 24, height: 24, fill: "currentColor" }}>
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/>
+              </svg>
             </div>
             <div className="widget-welcome-title">{title}</div>
             <div className="widget-welcome-text">{welcomeMessage}</div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px", justifyContent: "center" }}>
+              {["📦 Sipariş Durumu", "📞 İletişim Bilgileriniz", "🔄 İade ve Değişim"].map((quickReply) => (
+                <button
+                  key={quickReply}
+                  onClick={() => handleSend(quickReply)}
+                  style={{
+                    background: "#f3f4f6",
+                    border: `1px solid ${color}40`,
+                    color: "#374151",
+                    padding: "6px 12px",
+                    borderRadius: "16px",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    transition: "background 0.2s",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "#e5e7eb")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                >
+                  {quickReply}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

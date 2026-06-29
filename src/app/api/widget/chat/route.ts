@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
-import { conversations, messages } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { conversations, messages, products } from "@/lib/db/schema";
+import { eq, like } from "drizzle-orm";
 import { getSettings } from "@/lib/actions/chat";
 
 // CORS headers for external sites
@@ -86,9 +86,9 @@ export async function POST(req: NextRequest) {
 
     if (!convId) {
       convId = crypto.randomUUID();
-      let sysPrompt = "You are a helpful customer support assistant. Be concise and friendly. Answer in the same language as the user.";
+      let sysPrompt = "Siz, kurumsal bir e-ticaret markasının Profesyonel Müşteri İlişkileri Yöneticisisiniz. Müşterilere daima 'Siz' diyerek, nazik, saygılı ve çözüm odaklı yaklaşın. Kendi cümlelerinizi kurmakta özgürsünüz ancak KUSURSUZ VE DÜZGÜN BİR TÜRKÇE kullanmak zorundasınız (kelimeleri yanlış çekimlemeyin, anlamsız cümleler kurmayın). İletişim bilgileri sorulduğunda şu bilgileri kullanın: Çağrı merkezi: 0850 123 45 67, E-posta: destek@demoshop.com. Eğer mağazada genel olarak neler satıldığı sorulursa, elektronikten giyime, ayakkabıdan aksesuara kadar binlerce ürün sattığınızı düzgün bir Türkçeyle belirtin. DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN, doğrudan soruya odaklanın. Markdown kullanın. ÇOK ÖNEMLİ KURAL: Kesinlikle stokta olmayan veya size 'SİSTEM BİLGİSİ' olarak iletilmeyen hiçbir ürünü satıyormuş gibi uydurmayın. Eğer aranan kriterlere uygun bir ürün sistemden gelmezse, müşteriye düzgün ve kibar bir Türkçe ile aradığı ürünün şu an stokta/sistemde bulunmadığını belirtin ve başka bir ürün arayıp aramadığını sorun.";
       if (context) {
-        sysPrompt += `\n\nUse the following information about the site/products to answer the user's questions:\n${context}`;
+        sysPrompt += `\n\nAşağıdaki site ve ürün bilgilerini kullanarak kullanıcının sorularını cevapla:\n${context}`;
       }
 
       await db.insert(conversations).values({
@@ -100,6 +100,40 @@ export async function POST(req: NextRequest) {
       
       chatHistory.unshift({ role: "system", content: sysPrompt });
     }
+
+    // --- RAG INTENT DETECTION ---
+    try {
+      const ollamaRes = await fetch("http://localhost:11434/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: "Sen bir arama niyet okuma asistanısın. Kullanıcının mesajında herhangi bir e-ticaret ürünü (ayakkabı, çanta, saat, kulaklık, mont, gözlük vb.) arayıp aramadığını bul. Sadece aradığı tek kelimelik anahtar kelimeyi (Örn: 'mont', 'saat', 'ayakkabı') döndür. Ürün aramıyorsa veya kelime bulamazsan sadece 'null' kelimesini döndür." },
+            { role: "user", content: message }
+          ],
+          stream: false
+        })
+      });
+      
+      const intentData = await ollamaRes.json();
+      const intentKeyword = intentData.message?.content?.trim().toLowerCase() || "null";
+      if (intentKeyword && intentKeyword !== "null" && intentKeyword.length > 2) {
+        const cleanKeyword = intentKeyword.replace(/['"._]/g, '').trim();
+        const searchResults = await db.select().from(products).where(like(products.name, `%${cleanKeyword}%`)).limit(5);
+        
+        if (searchResults.length > 0) {
+          let ragContext = "\n\nSİSTEM BİLGİSİ (Kullanıcının aradığı ürünler veritabanında bulundu. Bunları müşteriye kurumsal bir dille sunun):\n";
+          searchResults.forEach(p => {
+            ragContext += `- ${p.emoji} ${p.name} : ${p.price} TL (Eski Fiyat: ${p.oldPrice} TL) - Değerlendirme: ${p.rating}\n`;
+          });
+          chatHistory.push({ role: "system", content: ragContext });
+        }
+      }
+    } catch (e) {
+      console.error("Intent RAG Error:", e);
+    }
+    // ----------------------------
 
     // Add user message
     chatHistory.push({ role: "user", content: message });
