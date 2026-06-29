@@ -86,9 +86,9 @@ export async function POST(req: NextRequest) {
 
     if (!convId) {
       convId = crypto.randomUUID();
-      let sysPrompt = "You are a helpful customer support assistant. Be concise and friendly. Answer in the same language as the user.";
+      let sysPrompt = "Sen uzman bir e-ticaret satış danışmanısın. Kullanıcıya ürün önerirken ikna edici ol, samimi bir dil kullan. Ürünleri listelerken markdown (maddeler, kalın yazılar) kullan. Gerekirse ek ürünler (upsell) öner. Kullanıcının dilinde yanıtla.";
       if (context) {
-        sysPrompt += `\n\nUse the following information about the site/products to answer the user's questions:\n${context}`;
+        sysPrompt += `\n\nAşağıdaki site ve ürün bilgilerini kullanarak kullanıcının sorularını cevapla:\n${context}`;
       }
 
       await db.insert(conversations).values({

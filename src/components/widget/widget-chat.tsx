@@ -42,9 +42,17 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
     e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px";
   };
 
-  const handleSend = async () => {
-    const trimmed = input.trim();
+  const handleSend = async (textOverride?: string | React.MouseEvent | React.FormEvent) => {
+    const override = typeof textOverride === "string" ? textOverride : undefined;
+    const trimmed = (override || input).trim();
     if (!trimmed || isStreaming) return;
+
+    if (!override) {
+      setInput("");
+      if (inputRef.current) {
+        inputRef.current.style.height = "40px";
+      }
+    }
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -61,12 +69,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
     };
 
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setInput("");
     setIsStreaming(true);
-
-    if (inputRef.current) {
-      inputRef.current.style.height = "40px";
-    }
 
     const abortController = new AbortController();
     abortRef.current = abortController;
@@ -199,6 +202,29 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
             </div>
             <div className="widget-welcome-title">{title}</div>
             <div className="widget-welcome-text">{welcomeMessage}</div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px", justifyContent: "center" }}>
+              {["📦 Kargo Takibi", "💸 İndirimli Ürünler", "🔄 İade Şartları"].map((quickReply) => (
+                <button
+                  key={quickReply}
+                  onClick={() => handleSend(quickReply)}
+                  style={{
+                    background: "#f3f4f6",
+                    border: `1px solid ${color}40`,
+                    color: "#374151",
+                    padding: "6px 12px",
+                    borderRadius: "16px",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    transition: "background 0.2s",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "#e5e7eb")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                >
+                  {quickReply}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

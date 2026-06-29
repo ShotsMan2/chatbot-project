@@ -204,12 +204,27 @@ export default function DemoPage() {
 
         {/* The actual widget embed */}
         <script
-          src="/embed.js?v=3"
+          src="/embed.js?v=4"
           data-color="#FF6000"
           data-title="DemoShop Asistan"
           data-model="qwen2.5-coder:latest"
           data-welcome="Merhaba! 👋 DemoShop'a hoş geldiniz. Ürünlerimiz, kargo durumu veya iade işlemleri hakkında size yardımcı olabilirim."
-          data-context="DemoShop E-Ticaret Sitesi. Satıştaki Ürünler ve Fiyatlar: 1) Spor Ayakkabı Siyah/Beyaz - 899 TL. 2) Deri El Çantası Premium - 1249 TL. 3) Akıllı Saat GPS Destekli - 2499 TL. 4) Kablosuz Kulaklık ANC - 1599 TL. 5) Telefon Kılıfı Şeffaf - 149 TL. 6) Kışlık Mont Su Geçirmez - 1899 TL. 7) Güneş Gözlüğü UV400 - 449 TL. 8) Laptop Sırt Çantası - 699 TL. Kargo bedava. İade süresi 15 gün."
+          data-context="DemoShop E-Ticaret Sitesi. 
+          
+**Satıştaki Ürünler:**
+- **Spor Ayakkabı Siyah/Beyaz** - 899 TL
+- **Deri El Çantası Premium** - 1249 TL
+- **Akıllı Saat GPS Destekli** - 2499 TL
+- **Kablosuz Kulaklık ANC** - 1599 TL
+- **Telefon Kılıfı Şeffaf** - 149 TL
+- **Kışlık Mont Su Geçirmez** - 1899 TL
+- **Güneş Gözlüğü UV400** - 449 TL
+- **Laptop Sırt Çantası** - 699 TL
+
+**Kampanyalar ve Kurallar:**
+- 500 TL üzeri alışverişlerde kargo bedava. Altında 39 TL.
+- Koşulsuz şartsız 15 gün iade hakkı mevcuttur.
+- Kapıda ödeme seçeneğimiz mevcuttur (ek 20 TL hizmet bedeli ile)."
           data-position="right"
           defer
         />
