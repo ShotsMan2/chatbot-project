@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     if (!convId) {
       convId = crypto.randomUUID();
-      let sysPrompt = "Siz, kurumsal bir e-ticaret markasının Profesyonel Müşteri İlişkileri Yöneticisisiniz. Müşterilere daima 'Siz' diyerek, nazik, saygılı ve çözüm odaklı yaklaşın. Ürün bilgisi verirken profesyonel bir üslup kullanın. İletişim bilgileri sorulduğunda doğrudan şu metni kullanın: 'Çağrı merkezimize **0850 123 45 67** numaralı telefondan veya **destek@demoshop.com** adresinden ulaşabilirsiniz.' Farklı veya hatalı Türkçe kelimeler (örn: telefonınızı) kullanmayın. DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN, doğrudan soruya odaklanın. Markdown kullanın.";
+      let sysPrompt = "Siz, kurumsal bir e-ticaret markasının Profesyonel Müşteri İlişkileri Yöneticisisiniz. Müşterilere daima 'Siz' diyerek, nazik, saygılı ve çözüm odaklı yaklaşın. Ürün bilgisi verirken profesyonel bir üslup kullanın. İletişim bilgileri sorulduğunda doğrudan şu metni kullanın: 'Çağrı merkezimize **0850 123 45 67** numaralı telefondan veya **destek@demoshop.com** adresinden ulaşabilirsiniz.' Eğer mağazada genel olarak neler satıldığı sorulursa doğrudan şu metni kullanın: 'DemoShop\\'ta geniş bir ürün yelpazesi mevcuttur. Elektronikten giyime, ayakkabıdan aksesuara kadar binlerce ürünü mağazamızda bulabilirsiniz. Belirli bir ürün arıyorsanız size yardımcı olmaktan memnuniyet duyarım.' Farklı veya hatalı Türkçe kelimeler (örn: telefonınızı, ürün kütüğü) kullanmayın. DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN, doğrudan soruya odaklanın. Markdown kullanın. ÇOK ÖNEMLİ KURAL: Kesinlikle stokta olmayan veya size 'SİSTEM BİLGİSİ' olarak iletilmeyen hiçbir ürünü (örn: Televizyon, Araba) satıyormuş gibi uydurmayın. Eğer sistem size ürün bilgisi vermediyse, 'Maalesef aradığınız kriterlere uygun ürün şu an bulamadım' deyin.";
       if (context) {
         sysPrompt += `\n\nAşağıdaki site ve ürün bilgilerini kullanarak kullanıcının sorularını cevapla:\n${context}`;
       }
@@ -103,15 +103,21 @@ export async function POST(req: NextRequest) {
 
     // --- RAG INTENT DETECTION ---
     try {
-      const intentResponse = await ollamaClient.chat({
-        model,
-        messages: [
-          { role: "system", content: "Sen bir arama niyet okuma asistanısın. Kullanıcının mesajında herhangi bir e-ticaret ürünü (ayakkabı, çanta, saat, kulaklık, mont, gözlük vb.) arayıp aramadığını bul. Sadece aradığı tek kelimelik anahtar kelimeyi (Örn: 'mont', 'saat', 'ayakkabı') döndür. Ürün aramıyorsa veya kelime bulamazsan sadece 'null' kelimesini döndür." },
-          { role: "user", content: message }
-        ]
+      const ollamaRes = await fetch("http://localhost:11434/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: "Sen bir arama niyet okuma asistanısın. Kullanıcının mesajında herhangi bir e-ticaret ürünü (ayakkabı, çanta, saat, kulaklık, mont, gözlük vb.) arayıp aramadığını bul. Sadece aradığı tek kelimelik anahtar kelimeyi (Örn: 'mont', 'saat', 'ayakkabı') döndür. Ürün aramıyorsa veya kelime bulamazsan sadece 'null' kelimesini döndür." },
+            { role: "user", content: message }
+          ],
+          stream: false
+        })
       });
       
-      const intentKeyword = intentResponse.message.content.trim().toLowerCase();
+      const intentData = await ollamaRes.json();
+      const intentKeyword = intentData.message?.content?.trim().toLowerCase() || "null";
       if (intentKeyword && intentKeyword !== "null" && intentKeyword.length > 2) {
         const cleanKeyword = intentKeyword.replace(/['"._]/g, '').trim();
         const searchResults = await db.select().from(products).where(like(products.name, `%${cleanKeyword}%`)).limit(5);
