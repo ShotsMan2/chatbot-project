@@ -30,3 +30,12 @@ export const settings = sqliteTable("settings", {
   temperature: real("temperature").notNull().default(0.7),
   contextSize: integer("context_size").notNull().default(4096),
 });
+
+export const products = sqliteTable("products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  price: text("price").notNull(),
+  oldPrice: text("old_price"),
+  rating: text("rating"),
+  emoji: text("emoji"),
+});

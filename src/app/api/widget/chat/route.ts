@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
-import { conversations, messages } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { conversations, messages, products } from "@/lib/db/schema";
+import { eq, like } from "drizzle-orm";
 import { getSettings } from "@/lib/actions/chat";
 
 // CORS headers for external sites
@@ -100,6 +100,34 @@ export async function POST(req: NextRequest) {
       
       chatHistory.unshift({ role: "system", content: sysPrompt });
     }
+
+    // --- RAG INTENT DETECTION ---
+    try {
+      const intentResponse = await ollamaClient.chat({
+        model,
+        messages: [
+          { role: "system", content: "Sen bir arama niyet okuma asistanısın. Kullanıcının mesajında herhangi bir e-ticaret ürünü (ayakkabı, çanta, saat, kulaklık, mont, gözlük vb.) arayıp aramadığını bul. Sadece aradığı tek kelimelik anahtar kelimeyi (Örn: 'mont', 'saat', 'ayakkabı') döndür. Ürün aramıyorsa veya kelime bulamazsan sadece 'null' kelimesini döndür." },
+          { role: "user", content: message }
+        ]
+      });
+      
+      const intentKeyword = intentResponse.message.content.trim().toLowerCase();
+      if (intentKeyword && intentKeyword !== "null" && intentKeyword.length > 2) {
+        const cleanKeyword = intentKeyword.replace(/['"._]/g, '').trim();
+        const searchResults = await db.select().from(products).where(like(products.name, `%${cleanKeyword}%`)).limit(5);
+        
+        if (searchResults.length > 0) {
+          let ragContext = "\n\nSİSTEM BİLGİSİ (Kullanıcının aradığı ürünler veritabanında bulundu. Bunları müşteriye kurumsal bir dille sunun):\n";
+          searchResults.forEach(p => {
+            ragContext += `- ${p.emoji} ${p.name} : ${p.price} TL (Eski Fiyat: ${p.oldPrice} TL) - Değerlendirme: ${p.rating}\n`;
+          });
+          chatHistory.push({ role: "system", content: ragContext });
+        }
+      }
+    } catch (e) {
+      console.error("Intent RAG Error:", e);
+    }
+    // ----------------------------
 
     // Add user message
     chatHistory.push({ role: "user", content: message });
