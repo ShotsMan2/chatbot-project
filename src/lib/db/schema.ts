@@ -38,4 +38,5 @@ export const products = sqliteTable("products", {
   oldPrice: text("old_price"),
   rating: text("rating"),
   emoji: text("emoji"),
+  sizes: text("sizes"), // e.g., "S, M, L" or "Standart"
 });
