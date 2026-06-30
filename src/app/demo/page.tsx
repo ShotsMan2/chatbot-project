@@ -206,7 +206,7 @@ export default function DemoPage() {
         <script
           src="/embed.js?v=9"
           data-color="#1e293b"
-          data-title="DemoShop Kurumsal Destek"
+          data-title="Sitemizin Efesi"
           data-model="qwen2.5-coder:latest"
           data-welcome="Değerli Müşterimiz, DemoShop'a hoş geldiniz. Size nasıl yardımcı olabilirim?"
           data-context="DemoShop E-Ticaret Sitesi. 
