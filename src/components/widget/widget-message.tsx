@@ -45,16 +45,16 @@ export function WidgetMessage({ message, color }: WidgetMessageProps) {
                   const name = props.children;
 
                   return (
-                    <div className="widget-product-card">
-                      <div className="widget-product-icon">{emoji}</div>
-                      <div className="widget-product-details">
-                        <div className="widget-product-name">{name}</div>
-                        <div className="widget-product-rating">⭐ {rating}</div>
-                        <div className="widget-product-prices">
+                    <span className="widget-product-card">
+                      <span className="widget-product-icon">{emoji}</span>
+                      <span className="widget-product-details">
+                        <span className="widget-product-name">{name}</span>
+                        <span className="widget-product-rating">⭐ {rating}</span>
+                        <span className="widget-product-prices">
                           <span className="widget-product-price">{price} TL</span>
                           <span className="widget-product-old-price">{oldPrice} TL</span>
-                        </div>
-                      </div>
+                        </span>
+                      </span>
                       <button 
                         className="widget-product-btn" 
                         style={{ background: color }}
@@ -62,7 +62,7 @@ export function WidgetMessage({ message, color }: WidgetMessageProps) {
                       >
                         Sepete Ekle
                       </button>
-                    </div>
+                    </span>
                   );
                 }
               }
