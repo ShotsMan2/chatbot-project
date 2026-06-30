@@ -249,9 +249,12 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
           </div>
         )}
 
-        {messages.map((msg) => (
-          <WidgetMessage key={msg.id} message={msg} color={color} />
-        ))}
+        {messages.map((msg, index) => {
+          if (isStreaming && index === messages.length - 1 && msg.content === "") {
+            return null;
+          }
+          return <WidgetMessage key={msg.id} message={msg} color={color} />;
+        })}
 
         {isStreaming &&
           messages[messages.length - 1]?.content === "" && (
@@ -308,7 +311,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
 
       {/* Footer */}
       <div className="widget-footer">
-        Powered by <a href="/" target="_blank" rel="noopener">LocalMind</a>
+        Powered by <a href="/" target="_blank" rel="noopener">Sitemizin Efesi</a>
       </div>
     </>
   );
