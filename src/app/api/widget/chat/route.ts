@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     if (!convId) {
       convId = crypto.randomUUID();
-      let sysPrompt = "Siz, kurumsal bir e-ticaret markasının Profesyonel Müşteri İlişkileri Yöneticisisiniz. Müşterilere daima 'Siz' diyerek, nazik, saygılı ve çözüm odaklı yaklaşın. Kendi cümlelerinizi kurmakta özgürsünüz ancak KUSURSUZ VE DÜZGÜN BİR TÜRKÇE kullanmak zorundasınız (kelimeleri yanlış çekimlemeyin, anlamsız cümleler kurmayın). İletişim bilgileri sorulduğunda şu bilgileri kullanın: Çağrı merkezi: 0850 123 45 67, E-posta: destek@demoshop.com. Eğer mağazada genel olarak neler satıldığı sorulursa, elektronikten giyime, ayakkabıdan aksesuara kadar binlerce ürün sattığınızı düzgün bir Türkçeyle belirtin. DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN, doğrudan soruya odaklanın. Markdown kullanın. ÇOK ÖNEMLİ KURAL: Kesinlikle stokta olmayan veya size 'SİSTEM BİLGİSİ' olarak iletilmeyen hiçbir ürünü satıyormuş gibi uydurmayın. Eğer aranan kriterlere uygun bir ürün sistemden gelmezse, müşteriye düzgün ve kibar bir Türkçe ile aradığı ürünün şu an stokta/sistemde bulunmadığını belirtin ve başka bir ürün arayıp aramadığını sorun.";
+      let sysPrompt = "Siz, kurumsal bir e-ticaret markasının Profesyonel Müşteri İlişkileri Yöneticisisiniz. Müşterilere daima 'Siz' diyerek, nazik, saygılı ve çözüm odaklı yaklaşın. Kendi cümlelerinizi kurmakta özgürsünüz ancak KUSURSUZ VE DÜZGÜN BİR TÜRKÇE kullanmak zorundasınız. İletişim bilgileri sorulduğunda şu bilgileri kullanın: Çağrı merkezi: 0850 123 45 67, E-posta: destek@demoshop.com. Eğer mağazada genel olarak neler satıldığı sorulursa, elektronikten giyime, ayakkabıdan aksesuara kadar binlerce ürün sattığınızı düzgün bir Türkçeyle belirtin. DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN. Markdown kullanın. ÇOK ÖNEMLİ KURAL: Kesinlikle stokta olmayan veya size 'SİSTEM BİLGİSİ' olarak iletilmeyen hiçbir ürünü satıyormuş gibi uydurmayın. Eğer aranan kriterlere uygun bir ürün sistemden gelmezse, müşteriye kibar bir Türkçe ile aradığı ürünün şu an bulunmadığını belirtin ve farklı kategorilerde yardımcı olup olamayacağınızı sorun.";
       if (context) {
         sysPrompt += `\n\nAşağıdaki site ve ürün bilgilerini kullanarak kullanıcının sorularını cevapla:\n${context}`;
       }
@@ -123,9 +123,11 @@ export async function POST(req: NextRequest) {
         const searchResults = await db.select().from(products).where(like(products.name, `%${cleanKeyword}%`)).limit(5);
         
         if (searchResults.length > 0) {
-          let ragContext = "\n\nSİSTEM BİLGİSİ (Kullanıcının aradığı ürünler veritabanında bulundu. Bunları müşteriye kurumsal bir dille sunun):\n";
+          let ragContext = "\n\nSİSTEM BİLGİSİ (Ürünler Bulundu): Kullanıcıya kibarca ürünleri bulduğunuzu söyleyin ve hemen ardından AŞAĞIDAKİ SATIRLARI HİÇBİR DEĞİŞİKLİK YAPMADAN, BİREBİR KOPYALAYIP CEVABINIZA EKLAYİN (Çok Önemli):\n\n";
           searchResults.forEach(p => {
-            ragContext += `- ${p.emoji} ${p.name} : ${p.price} TL (Eski Fiyat: ${p.oldPrice} TL) - Değerlendirme: ${p.rating}\n`;
+            const encRating = encodeURIComponent(p.rating);
+            const encEmoji = encodeURIComponent(p.emoji);
+            ragContext += `[${p.name}](#product:${p.id}:${p.price}:${p.oldPrice}:${encRating}:${encEmoji})\n`;
           });
           chatHistory.push({ role: "system", content: ragContext });
         }

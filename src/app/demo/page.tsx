@@ -204,7 +204,7 @@ export default function DemoPage() {
 
         {/* The actual widget embed */}
         <script
-          src="/embed.js?v=8"
+          src="/embed.js?v=9"
           data-color="#1e293b"
           data-title="DemoShop Kurumsal Destek"
           data-model="qwen2.5-coder:latest"
