@@ -129,24 +129,24 @@ export default function DemoPage() {
         </nav>
 
         {/* Hero */}
-        <div className="demo-hero">
+        <header className="demo-hero">
           <h1>Süper Fırsatlar Başladı! 🎉</h1>
           <p>En sevdiğiniz ürünlerde %50&apos;ye varan indirimler</p>
-        </div>
+        </header>
 
         {/* Products */}
         <div className="demo-section">
           <h2>Çok Satanlar</h2>
           <div className="demo-grid">
             {[
-              { emoji: "👟", name: "Spor Ayakkabı - Siyah/Beyaz", price: "899", old: "1.299", rating: "4.8 (2.3K)" },
-              { emoji: "👜", name: "Deri El Çantası - Premium", price: "1.249", old: "1.899", rating: "4.7 (856)" },
-              { emoji: "⌚", name: "Akıllı Saat - GPS Destekli", price: "2.499", old: "3.299", rating: "4.9 (5.1K)" },
-              { emoji: "🎧", name: "Kablosuz Kulaklık - ANC", price: "1.599", old: "2.199", rating: "4.6 (1.2K)" },
-              { emoji: "📱", name: "Telefon Kılıfı - Şeffaf", price: "149", old: "249", rating: "4.5 (3.4K)" },
-              { emoji: "🧥", name: "Kışlık Mont - Su Geçirmez", price: "1.899", old: "2.799", rating: "4.8 (945)" },
-              { emoji: "👓", name: "Güneş Gözlüğü - UV400", price: "449", old: "699", rating: "4.4 (678)" },
-              { emoji: "🎒", name: "Laptop Sırt Çantası", price: "699", old: "999", rating: "4.7 (2.1K)" },
+              { name: "Spor Ayakkabı - Siyah/Beyaz", price: "899", old: "1.299", emoji: "👟", rating: "4.8 (2.3K)" },
+              { name: "Deri El Çantası - Premium", price: "1.249", old: "1.899", emoji: "👜", rating: "4.7 (856)" },
+              { name: "Akıllı Saat - GPS Destekli", price: "2.499", old: "3.299", emoji: "⌚", rating: "4.9 (5.1K)" },
+              { name: "Kablosuz Kulaklık - ANC", price: "1.599", old: "2.199", emoji: "🎧", rating: "4.6 (1.2K)" },
+              { name: "Telefon Kılıfı - Şeffaf", price: "149", old: "249", emoji: "📱", rating: "4.5 (3.4K)" },
+              { name: "Kışlık Mont - Su Geçirmez", price: "1.899", old: "2.799", emoji: "🧥", rating: "4.8 (945)" },
+              { name: "Güneş Gözlüğü - UV400", price: "449", old: "699", emoji: "🕶️", rating: "4.4 (678)" },
+              { name: "Laptop Sırt Çantası", price: "699", old: "999", emoji: "🎒", rating: "4.7 (2.1K)" },
             ].map((product, i) => (
               <div key={i} className="demo-card">
                 <div className="demo-card-img">{product.emoji}</div>
@@ -204,7 +204,7 @@ export default function DemoPage() {
 
         {/* The actual widget embed */}
         <script
-          src="/embed.js?v=9"
+          src="/embed.js?v=11"
           data-color="#1e293b"
           data-title="Sitemizin Efesi"
           data-model="qwen2.5-coder:latest"
