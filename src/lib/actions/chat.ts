@@ -39,6 +39,14 @@ export async function getSettings() {
   return setting!;
 }
 
+export async function updateLastCleanup(count: number) {
+  await db.update(settings).set({
+    lastCleanupAt: new Date(),
+    lastCleanupCount: count,
+  }).where(eq(settings.id, 1));
+  revalidatePath("/");
+}
+
 export async function updateSettings(data: Partial<typeof settings.$inferInsert>) {
   await db.update(settings).set(data).where(eq(settings.id, 1));
   revalidatePath("/");
