@@ -171,7 +171,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsg.id
-              ? { ...m, content: "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.", status: "failed" }
+              ? { ...m, content: "Sistemimizde anlık bir yoğunluk yaşıyoruz. Lütfen kısa bir süre sonra tekrar deneyebilir misiniz?", status: "failed" }
               : m
           )
         );
@@ -274,7 +274,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
           <textarea
             ref={inputRef}
             className="widget-input"
-            placeholder="Mesajınızı yazın..."
+            placeholder="Size nasıl yardımcı olabilirim?..."
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}

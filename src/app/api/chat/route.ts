@@ -4,6 +4,7 @@ import { chatRequestSchema } from "@/lib/validation/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
 import { conversations, messages } from "@/lib/db/schema";
+import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
 import { eq } from "drizzle-orm";
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
         id: convId,
         title: lastUserMessage.content.slice(0, 50) + "...",
         model,
-        systemPrompt: "", // Set default if needed
+        systemPrompt: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT,
       });
     }
 
@@ -65,9 +66,15 @@ export async function POST(req: NextRequest) {
       const onClientAbort = () => ollamaAbort.abort();
       req.signal.addEventListener("abort", onClientAbort, { once: true });
 
+      // Ensure system prompt is the first message
+      const messagesWithSystem = [
+        { role: "system", content: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT },
+        ...chatMessages.filter((m: any) => m.role !== "system")
+      ];
+
       const ollamaStream = await ollamaClient.chat({
         model,
-        messages: chatMessages,
+        messages: messagesWithSystem,
         options: { temperature, num_ctx: contextSize },
         signal: ollamaAbort.signal,
       });

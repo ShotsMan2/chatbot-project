@@ -29,6 +29,8 @@ export const settings = sqliteTable("settings", {
   defaultSystemPrompt: text("default_system_prompt").notNull().default("You are a helpful AI assistant."),
   temperature: real("temperature").notNull().default(0.7),
   contextSize: integer("context_size").notNull().default(4096),
+  lastCleanupAt: integer("last_cleanup_at", { mode: "timestamp" }),
+  lastCleanupCount: integer("last_cleanup_count"),
 });
 
 export const products = sqliteTable("products", {
@@ -38,4 +40,5 @@ export const products = sqliteTable("products", {
   oldPrice: text("old_price"),
   rating: text("rating"),
   emoji: text("emoji"),
+  sizes: text("sizes"), // e.g., "S, M, L" or "Standart"
 });
