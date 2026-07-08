@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
 import { conversations, messages, products } from "@/lib/db/schema";
-import { eq, like } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
 import { getSettings } from "@/lib/actions/chat";
 
 // CORS headers for external sites
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         .select()
         .from(conversations)
         .where(eq(conversations.id, convId))
-        .get();
+        .limit(1).then((res) => res[0]);
 
       if (conv) {
         // Load previous messages for context
@@ -128,7 +128,7 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
       const intentKeyword = intentData.message?.content?.trim().toLowerCase() || "null";
       if (intentKeyword && intentKeyword !== "null" && intentKeyword.length > 2) {
         const cleanKeyword = intentKeyword.replace(/['"._]/g, '').trim();
-        const searchResults = await db.select().from(products).where(like(products.name, `%${cleanKeyword}%`)).limit(5);
+        const searchResults = await db.select().from(products).where(ilike(products.name, `%${cleanKeyword}%`)).limit(5);
         
         if (searchResults.length > 0) {
           let ragContext = "\n\nSİSTEM BİLGİSİ (Ürünler Bulundu): Kullanıcıya kibarca ürünleri bulduğunuzu söyleyin ve hemen ardından AŞAĞIDAKİ SATIRLARI HİÇBİR DEĞİŞİKLİK YAPMADAN, BİREBİR KOPYALAYIP CEVABINIZA EKLAYİN (Çok Önemli):\n\n";

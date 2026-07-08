@@ -3,10 +3,30 @@ import { z } from "zod";
 import { chatRequestSchema } from "@/lib/validation/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
-import { conversations, messages } from "@/lib/db/schema";
+import { conversations, messages, products } from "@/lib/db/schema";
 import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
-import { eq } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
+
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "search_products",
+      description: "Veritabanındaki e-ticaret ürünlerini arar ve filtreler.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: {
+            type: "string",
+            description: "Aranacak ürün kelimesi (örn: çanta, saat, deri)"
+          }
+        },
+        required: ["keyword"]
+      }
+    }
+  }
+];
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,10 +40,9 @@ export async function POST(req: NextRequest) {
     const { model, messages: chatMessages, conversationId, temperature, contextSize } = result.data;
     const lastUserMessage = chatMessages[chatMessages.length - 1];
 
-    // If conversationId is provided, make sure it exists
     let convId = conversationId;
     if (convId) {
-      const conv = await db.select().from(conversations).where(eq(conversations.id, convId)).get();
+      const conv = await db.select().from(conversations).where(eq(conversations.id, convId)).limit(1).then((res) => res[0]);
       if (!conv) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
       }
@@ -37,7 +56,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Save the user's message
     const userMessageId = crypto.randomUUID();
     await db.insert(messages).values({
       id: userMessageId,
@@ -49,7 +67,6 @@ export async function POST(req: NextRequest) {
 
     const assistantMessageId = crypto.randomUUID();
     
-    // We will save the assistant message initially as 'pending'
     await db.insert(messages).values({
       id: assistantMessageId,
       conversationId: convId,
@@ -59,97 +76,143 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      // Create our own AbortController to forward cancellation to Ollama
       const ollamaAbort = new AbortController();
-
-      // If the client disconnects (req.signal aborts), abort Ollama too
       const onClientAbort = () => ollamaAbort.abort();
       req.signal.addEventListener("abort", onClientAbort, { once: true });
 
-      // Ensure system prompt is the first message
       const messagesWithSystem = [
         { role: "system", content: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT },
         ...chatMessages.filter((m: any) => m.role !== "system")
-      ];
+      ] as import("@/lib/ollama/ollama-types").ChatMessage[];
 
-      const ollamaStream = await ollamaClient.chat({
-        model,
-        messages: messagesWithSystem,
-        options: { temperature, num_ctx: contextSize },
-        signal: ollamaAbort.signal,
-      });
-
-      // Intercept the stream to accumulate the response and save it to DB
-      let accumulatedContent = "";
-      let totalDuration = 0;
-      let promptTokens = 0;
-      let completionTokens = 0;
-
-      const decoder = new TextDecoder();
-      
       const wrappedStream = new ReadableStream({
         async start(controller) {
-          const reader = ollamaStream.getReader();
           try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                // Save final message to DB
-                await db.update(messages).set({
-                  content: accumulatedContent,
-                  status: "completed",
-                  totalDuration,
-                  promptTokens,
-                  completionTokens
-                }).where(eq(messages.id, assistantMessageId));
-                
-                controller.close();
-                break;
-              }
-              
-              if (value) {
-                controller.enqueue(value);
+            let isToolCalling = true;
+            let runMessages = [...messagesWithSystem];
+            let accumulatedContent = "";
+            let totalDuration = 0;
+            let promptTokens = 0;
+            let completionTokens = 0;
+            const decoder = new TextDecoder();
+
+            while (isToolCalling) {
+              const stream = await ollamaClient.chat({
+                model,
+                messages: runMessages,
+                options: { temperature, num_ctx: contextSize },
+                tools: TOOLS,
+                signal: ollamaAbort.signal,
+              });
+
+              const reader = stream.getReader();
+              let streamHasToolCall = false;
+              let currentToolCalls: any[] = [];
+              let currentAssistantContent = "";
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
                 const chunkStr = decoder.decode(value, { stream: true });
                 const lines = chunkStr.split("\n").filter(Boolean);
+                
                 for (const line of lines) {
                   try {
                     const parsed = JSON.parse(line);
-                    if (parsed.message?.content) {
-                      accumulatedContent += parsed.message.content;
+                    if (parsed.message?.tool_calls && parsed.message.tool_calls.length > 0) {
+                      streamHasToolCall = true;
+                      for (const tc of parsed.message.tool_calls) {
+                        currentToolCalls.push(tc);
+                      }
+                    } else if (parsed.message?.content) {
+                      currentAssistantContent += parsed.message.content;
+                      if (!streamHasToolCall) {
+                        accumulatedContent += parsed.message.content;
+                      }
                     }
                     if (parsed.done) {
-                      totalDuration = parsed.total_duration || 0;
-                      promptTokens = parsed.prompt_eval_count || 0;
-                      completionTokens = parsed.eval_count || 0;
+                      totalDuration += parsed.total_duration || 0;
+                      promptTokens += parsed.prompt_eval_count || 0;
+                      completionTokens += parsed.eval_count || 0;
                     }
                   } catch (e) {
                     // ignore parse errors for partial chunks in the interceptor
                   }
                 }
+
+                if (!streamHasToolCall && value) {
+                  controller.enqueue(value);
+                }
+              }
+              reader.releaseLock();
+
+              if (streamHasToolCall && currentToolCalls.length > 0) {
+                 runMessages.push({ 
+                   role: "assistant", 
+                   content: currentAssistantContent, 
+                   tool_calls: currentToolCalls 
+                 } as any);
+                 
+                 for (const tc of currentToolCalls) {
+                   if (tc.function.name === "search_products") {
+                     const args = tc.function.arguments;
+                     const keyword = args.keyword || "";
+                     const cleanKeyword = keyword.replace(/['"._]/g, '').trim();
+                     let productsData: any[] = [];
+                     
+                     if (cleanKeyword.length > 2) {
+                       const searchResults = await db.select()
+                         .from(products)
+                         .where(ilike(products.name, `%${cleanKeyword}%`))
+                         .limit(10);
+                       productsData = searchResults.map(p => ({
+                         name: p.name,
+                         price: p.price,
+                         sizes: p.sizes,
+                         emoji: p.emoji
+                       }));
+                     }
+
+                     runMessages.push({
+                       role: "tool",
+                       content: JSON.stringify({
+                         products: productsData
+                       })
+                     });
+                   }
+                 }
+              } else {
+                 isToolCalling = false;
+                 
+                 await db.update(messages).set({
+                   content: accumulatedContent,
+                   status: "completed",
+                   totalDuration,
+                   promptTokens,
+                   completionTokens
+                 }).where(eq(messages.id, assistantMessageId));
+                 
+                 controller.close();
               }
             }
           } catch (error) {
             if (error instanceof Error && error.name === "AbortError") {
               await db.update(messages).set({
-                content: accumulatedContent,
                 status: "cancelled",
               }).where(eq(messages.id, assistantMessageId));
             } else {
               await db.update(messages).set({
-                content: accumulatedContent,
                 status: "failed",
               }).where(eq(messages.id, assistantMessageId));
             }
             controller.error(error);
           } finally {
-            reader.releaseLock();
             req.signal.removeEventListener("abort", onClientAbort);
           }
         },
         cancel() {
-          // When the client disconnects / stream is cancelled, abort Ollama
-          ollamaAbort.abort();
-          ollamaStream.cancel();
+           ollamaAbort.abort();
         }
       });
 

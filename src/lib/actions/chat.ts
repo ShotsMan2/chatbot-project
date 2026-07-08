@@ -10,7 +10,7 @@ export async function getConversations() {
 }
 
 export async function getConversation(id: string) {
-  const conv = await db.select().from(conversations).where(eq(conversations.id, id)).get();
+  const conv = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1).then((res) => res[0]);
   return conv || null;
 }
 
@@ -31,10 +31,10 @@ export async function clearAllConversations() {
 }
 
 export async function getSettings() {
-  let setting = await db.select().from(settings).where(eq(settings.id, 1)).get();
+  let setting = await db.select().from(settings).where(eq(settings.id, 1)).limit(1).then((res) => res[0]);
   if (!setting) {
     await db.insert(settings).values({ id: 1 }).execute();
-    setting = await db.select().from(settings).where(eq(settings.id, 1)).get();
+    setting = await db.select().from(settings).where(eq(settings.id, 1)).limit(1).then((res) => res[0]);
   }
   return setting!;
 }
@@ -44,7 +44,12 @@ export async function updateLastCleanup(count: number) {
     lastCleanupAt: new Date(),
     lastCleanupCount: count,
   }).where(eq(settings.id, 1));
-  revalidatePath("/");
+  try {
+    const { revalidatePath } = require("next/cache");
+    revalidatePath("/");
+  } catch (e) {
+    // Ignore if not in request context
+  }
 }
 
 export async function updateSettings(data: Partial<typeof settings.$inferInsert>) {

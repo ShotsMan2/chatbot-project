@@ -6,8 +6,9 @@ export interface ModelInfo {
 }
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_calls?: any[];
 }
 
 export interface ChatInput {
@@ -18,6 +19,7 @@ export interface ChatInput {
     temperature?: number;
     num_ctx?: number;
   };
+  tools?: any[];
   signal?: AbortSignal;
 }
 
@@ -33,6 +35,7 @@ export interface OllamaChatResponseChunk {
   message: {
     role: string;
     content: string;
+    tool_calls?: any[];
   };
   done: boolean;
   total_duration?: number;

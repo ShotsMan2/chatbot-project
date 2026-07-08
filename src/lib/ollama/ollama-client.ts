@@ -53,6 +53,7 @@ export class OllamaProvider implements LlmProvider {
           messages: input.messages,
           stream: input.stream !== false,
           options: input.options,
+          tools: input.tools,
         }),
         signal: input.signal,
       });

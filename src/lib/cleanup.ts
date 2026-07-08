@@ -6,7 +6,7 @@ import { updateLastCleanup } from "@/lib/actions/chat";
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
 export async function isCleanupDue(): Promise<boolean> {
-  const setting = await db.select().from(settings).where(lt(settings.id, 2)).get();
+  const setting = await db.select().from(settings).where(lt(settings.id, 2)).limit(1).then((res) => res[0]);
   if (!setting?.lastCleanupAt) return true;
   return Date.now() - setting.lastCleanupAt.getTime() >= THREE_DAYS_MS;
 }
@@ -30,7 +30,7 @@ export async function runCleanup(): Promise<{ deletedCount: number }> {
 }
 
 export async function getCleanupInfo(): Promise<{ lastCleanupAt: Date | null; lastCleanupCount: number | null } | null> {
-  const setting = await db.select().from(settings).where(lt(settings.id, 2)).get();
+  const setting = await db.select().from(settings).where(lt(settings.id, 2)).limit(1).then((res) => res[0]);
   if (!setting?.lastCleanupAt) return null;
   return {
     lastCleanupAt: setting.lastCleanupAt,
