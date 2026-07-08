@@ -229,7 +229,13 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
       },
       cancel() {
         ollamaAbort.abort();
-        ollamaStream.cancel();
+        if (!ollamaStream.locked) {
+          try {
+            ollamaStream.cancel().catch(() => {});
+          } catch (e) {
+            // Ignore cancel errors
+          }
+        }
       },
     });
 
