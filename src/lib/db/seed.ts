@@ -3,31 +3,146 @@ import { products } from "./schema";
 
 async function seed() {
   console.log("Starting seed...");
-  const emojis = ['👟', '👜', '⌚', '🎧', '📱', '🧥', '👓', '🎒'];
-  const names = ['Spor Ayakkabı', 'Deri Çanta', 'Akıllı Saat', 'Kulaklık', 'Telefon Kılıfı', 'Kışlık Mont', 'Gözlük', 'Sırt Çantası'];
   
-  const batchSize = 1000;
-  for (let i = 0; i < 10000; i += batchSize) {
-    const batch = [];
-    for (let j = 0; j < batchSize; j++) {
-      const idx = i + j;
-      const emoji = emojis[idx % emojis.length];
-      const name = names[idx % names.length] + ' ' + (idx + 1);
-      const price = ((idx % 1000) + 100).toString();
-      const oldPrice = ((idx % 1000) + 200).toString();
-      const rating = '4.' + (idx % 9) + ' (' + idx + 'K)';
-      
-      batch.push({
-        name,
-        price,
-        oldPrice,
-        rating,
-        emoji,
-      });
+  // Clear existing products
+  await db.delete(products);
+
+  const realProducts = [
+    {
+      name: "Spor Ayakkabı - Siyah/Beyaz",
+      brand: "DemoShop",
+      category: "Ayakkabı",
+      description: "Günlük kullanım için ideal, rahat ve şık spor ayakkabı.",
+      price: "899",
+      priceValue: "899.00",
+      oldPrice: "1.299",
+      oldPriceValue: "1299.00",
+      rating: "4.8 (2.3K)",
+      emoji: "👟",
+      sizes: "38, 39, 40, 41, 42, 43, 44",
+      variants: { "colors": ["Siyah/Beyaz"] },
+      stock: 150,
+      campaign: "Bahar Fırsatı",
+      status: "active" as const,
+    },
+    {
+      name: "Deri El Çantası - Premium",
+      brand: "DemoShop",
+      category: "Çanta",
+      description: "Hakiki deri, geniş iç hacimli, premium kadın el çantası.",
+      price: "1.249",
+      priceValue: "1249.00",
+      oldPrice: "1.899",
+      oldPriceValue: "1899.00",
+      rating: "4.7 (856)",
+      emoji: "👜",
+      sizes: "Standart",
+      variants: { "colors": ["Siyah", "Kahverengi", "Taba"] },
+      stock: 50,
+      status: "active" as const,
+    },
+    {
+      name: "Akıllı Saat - GPS Destekli",
+      brand: "DemoShop",
+      category: "Akıllı Saat",
+      description: "Adımsayar, nabız ölçer ve GPS özellikli yeni nesil akıllı saat.",
+      price: "2.499",
+      priceValue: "2499.00",
+      oldPrice: "3.299",
+      oldPriceValue: "3299.00",
+      rating: "4.9 (5.1K)",
+      emoji: "⌚",
+      sizes: "Standart",
+      variants: { "colors": ["Siyah", "Gümüş"] },
+      stock: 120,
+      status: "active" as const,
+    },
+    {
+      name: "Kablosuz Kulaklık - ANC",
+      brand: "DemoShop",
+      category: "Kulaklık",
+      description: "Aktif gürültü engelleme (ANC) özellikli Bluetooth kablosuz kulaklık.",
+      price: "1.599",
+      priceValue: "1599.00",
+      oldPrice: "2.199",
+      oldPriceValue: "2199.00",
+      rating: "4.6 (1.2K)",
+      emoji: "🎧",
+      sizes: "Standart",
+      variants: { "colors": ["Beyaz", "Siyah"] },
+      stock: 80,
+      status: "active" as const,
+    },
+    {
+      name: "Telefon Kılıfı - Şeffaf",
+      brand: "DemoShop",
+      category: "Telefon Kılıfı",
+      description: "Sararmaya karşı dirençli, ince ve şık şeffaf silikon kılıf.",
+      price: "149",
+      priceValue: "149.00",
+      oldPrice: "249",
+      oldPriceValue: "249.00",
+      rating: "4.5 (3.4K)",
+      emoji: "📱",
+      sizes: "Standart",
+      variants: { "compatibility": ["iPhone 14", "iPhone 15", "Samsung S23"] },
+      stock: 500,
+      status: "active" as const,
+    },
+    {
+      name: "Kışlık Mont - Su Geçirmez",
+      brand: "DemoShop",
+      category: "Giyim",
+      description: "Zorlu kış şartlarına dayanıklı, rüzgar ve su geçirmez kışlık mont.",
+      price: "1.899",
+      priceValue: "1899.00",
+      oldPrice: "2.799",
+      oldPriceValue: "2799.00",
+      rating: "4.8 (945)",
+      emoji: "🧥",
+      sizes: "S, M, L, XL, XXL",
+      variants: { "colors": ["Siyah", "Haki", "Lacivert"] },
+      stock: 75,
+      status: "active" as const,
+    },
+    {
+      name: "Güneş Gözlüğü - UV400",
+      brand: "DemoShop",
+      category: "Aksesuar",
+      description: "UV400 korumalı, polarize camlı unisex güneş gözlüğü.",
+      price: "449",
+      priceValue: "449.00",
+      oldPrice: "699",
+      oldPriceValue: "699.00",
+      rating: "4.4 (678)",
+      emoji: "🕶️",
+      sizes: "Standart",
+      variants: { "colors": ["Siyah", "Kahverengi"] },
+      stock: 200,
+      campaign: "Yaz Fırsatı",
+      status: "active" as const,
+    },
+    {
+      name: "Laptop Sırt Çantası",
+      brand: "DemoShop",
+      category: "Çanta",
+      description: "15.6 inç laptop bölmeli, suya dayanıklı, ergonomik sırt çantası.",
+      price: "699",
+      priceValue: "699.00",
+      oldPrice: "999",
+      oldPriceValue: "999.00",
+      rating: "4.7 (2.1K)",
+      emoji: "🎒",
+      sizes: "Standart",
+      variants: { "colors": ["Siyah", "Gri"] },
+      stock: 110,
+      status: "active" as const,
     }
-    await db.insert(products).values(batch);
-    console.log(`Inserted ${i + batchSize} products`);
-  }
+  ];
+
+  await db.insert(products).values(realProducts);
+  console.log(`Inserted ${realProducts.length} realistic products`);
+  
   console.log("Done seeding!");
 }
 

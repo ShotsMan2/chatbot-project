@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { conversations, messages } from "@/lib/db/schema";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
 import { eq } from "drizzle-orm";
+import { ZERO_HALLUCINATION_SYSTEM_PROMPT, INTENT_CLASSIFIER_PROMPT } from "@/lib/orchestrator/prompts";
+import { searchProducts } from "@/lib/orchestrator/tools";
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
     // If conversationId is provided, make sure it exists
     let convId = conversationId;
     if (convId) {
-      const conv = await db.select().from(conversations).where(eq(conversations.id, convId)).get();
+      const [conv] = await db.select().from(conversations).where(eq(conversations.id, convId)).limit(1);
       if (!conv) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
       }
@@ -65,9 +67,94 @@ export async function POST(req: NextRequest) {
       const onClientAbort = () => ollamaAbort.abort();
       req.signal.addEventListener("abort", onClientAbort, { once: true });
 
+      // ================= ORCHESTRATOR LOGIC =================
+
+      let searchResultsStr = "Arama Sonuçları: []";
+      
+      try {
+        const intentStartTime = Date.now();
+        // Step 1: Intent Classification
+        const intentStream = await ollamaClient.chat({
+          model: model, // Using the same model for classification, could be a smaller faster model
+          messages: [
+            { role: "system", content: INTENT_CLASSIFIER_PROMPT },
+            { role: "user", content: lastUserMessage.content }
+          ],
+          options: { temperature: 0.1, num_ctx: 1024 },
+          stream: false, // We need the full response
+          signal: ollamaAbort.signal,
+        });
+
+        const intentReader = intentStream.getReader();
+        const { value: intentValue } = await intentReader.read();
+        intentReader.releaseLock();
+        
+        if (intentValue) {
+          const decoder = new TextDecoder();
+          const intentResponseStr = decoder.decode(intentValue);
+          const lines = intentResponseStr.split("\n").filter(Boolean);
+          let parsedIntent: { needsSearch?: boolean, query?: string, category?: string, brand?: string, intent?: string } = {};
+
+          // Extract JSON from response (handling potential markdown formatting)
+          for (const line of lines) {
+             try {
+                const chunk = JSON.parse(line);
+                if (chunk.message?.content) {
+                   const jsonMatch = chunk.message.content.match(/\{[\s\S]*\}/);
+                   if (jsonMatch) {
+                      parsedIntent = JSON.parse(jsonMatch[0]);
+                   }
+                }
+             } catch (e) {
+                // ignore parsing errors
+             }
+          }
+          console.log(`[Orchestrator] Intent Extraction took ${Date.now() - intentStartTime}ms`);
+
+          // Step 2: Search Products if needed
+          if (parsedIntent?.needsSearch) {
+             console.log("[Orchestrator] Needs search. Extracted:", parsedIntent);
+             const results = await searchProducts({
+                query: parsedIntent.query,
+                category: parsedIntent.category,
+                brand: parsedIntent.brand
+             });
+             
+             if (results.length > 0) {
+                 searchResultsStr = "Arama Sonuçları (Search Results): \n" + JSON.stringify(results, null, 2);
+             } else {
+                 searchResultsStr = "Arama Sonuçları: [Bulunamadı]";
+             }
+          } else {
+             console.log("[Orchestrator] No search needed.");
+          }
+        }
+      } catch (e) {
+        console.error("[Orchestrator] Intent classification or search failed:", e);
+        // Fallback: If intent fails, do a raw search with the user message as a safety net!
+        try {
+           const results = await searchProducts({ query: lastUserMessage.content });
+           searchResultsStr = "Arama Sonuçları (Search Results): \n" + JSON.stringify(results, null, 2);
+        } catch (innerError) {
+           console.error("[Orchestrator] Ultimate fallback search failed:", innerError);
+        }
+      }
+
+      // Step 3: Inject System Prompt and Search Results
+      const finalSystemMessage = `${ZERO_HALLUCINATION_SYSTEM_PROMPT}\n\n${searchResultsStr}`;
+      
+      // Rebuild messages list with the strict system prompt
+      const finalMessages = [
+        { role: "system" as const, content: finalSystemMessage },
+        ...chatMessages.filter(m => m.role !== "system") // Remove any existing system prompts
+      ];
+
+      // ================= END ORCHESTRATOR LOGIC =================
+
+      // Step 4: Stream the verified generation
       const ollamaStream = await ollamaClient.chat({
         model,
-        messages: chatMessages,
+        messages: finalMessages,
         options: { temperature, num_ctx: contextSize },
         signal: ollamaAbort.signal,
       });

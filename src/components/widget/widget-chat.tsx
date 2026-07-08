@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { WidgetMessage } from "./widget-message";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  status: "completed" | "streaming" | "failed";
-}
+import { WidgetMessage, Message } from "./widget-message";
 
 interface WidgetChatProps {
   color: string;
@@ -19,104 +12,76 @@ interface WidgetChatProps {
 }
 
 export function WidgetChat({ color, title, welcomeMessage, model, context }: WidgetChatProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [localContext, setLocalContext] = useState(context);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === "localmind:init_context" && event.data.context) {
-        setLocalContext(event.data.context);
-      }
-    };
-    window.addEventListener("message", handleMessage);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-    // Notify parent that we are ready to receive the context
-    window.parent.postMessage({ type: "localmind:ready" }, "*");
-
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
-
-  // Auto-resize textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    e.target.style.height = "40px";
-    e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px";
   };
 
-  const handleSend = async (textOverride?: string | React.MouseEvent | React.FormEvent) => {
-    const override = typeof textOverride === "string" ? textOverride : undefined;
-    const trimmed = (override || input).trim();
-    if (!trimmed || isStreaming) return;
+  const sendMessage = async (content: string) => {
+    if (!content.trim()) return;
 
-    if (!override) {
-      setInput("");
-      if (inputRef.current) {
-        inputRef.current.style.height = "40px";
-      }
-    }
-
-    const userMsg: Message = {
+    const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
-      content: trimmed,
-      status: "completed",
+      content: content.trim(),
     };
 
-    const assistantMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      status: "streaming",
-    };
-
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setIsStreaming(true);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
+    setInput("");
+    setIsLoading(true);
 
     const abortController = new AbortController();
-    abortRef.current = abortController;
+    abortControllerRef.current = abortController;
 
     try {
       const response = await fetch("/api/widget/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          message: trimmed,
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           sessionId,
-          ...(model ? { model } : {}),
-          ...(localContext ? { context: localContext } : {}),
+          model,
+          context: localContext,
         }),
         signal: abortController.signal,
       });
 
       if (!response.ok) {
-        throw new Error("API error");
+        throw new Error(response.statusText);
       }
 
       const returnedSessionId = response.headers.get("X-Session-Id");
-      if (returnedSessionId) {
+      if (returnedSessionId && returnedSessionId !== sessionId) {
         setSessionId(returnedSessionId);
       }
 
       const reader = response.body?.getReader();
-      if (!reader) throw new Error("No stream");
+      if (!reader) throw new Error("No response body");
 
       const decoder = new TextDecoder();
-      let accumulated = "";
       let buffer = "";
+      
+      const assistantMessageId = crypto.randomUUID();
+      const assistantMessage: Message = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        toolInvocations: [],
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -127,72 +92,105 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          const trimmedLine = line.trim();
-          if (!trimmedLine) continue;
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
           try {
-            const parsed = JSON.parse(trimmedLine);
-            if (parsed.message?.content) {
-              accumulated += parsed.message.content;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantMsg.id
-                    ? { ...m, content: accumulated }
-                    : m
-                )
-              );
+            const data = JSON.parse(trimmed);
+            
+            // Handle both Ollama chat API (/api/chat) and generate API (/api/generate) formats
+            const contentChunk = data.message?.content || data.response || "";
+
+            if (contentChunk) {
+              setMessages(prev => prev.map(msg => {
+                if (msg.id === assistantMessageId) {
+                  return { ...msg, content: msg.content + contentChunk };
+                }
+                return msg;
+              }));
             }
-          } catch {
-            // ignore partial parse
+          } catch (e) {
+            // Buffer structure is preserved for incomplete JSONs
           }
         }
       }
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMsg.id
-            ? { ...m, content: accumulated, status: "completed" }
-            : m
-        )
-      );
+      setMessages(prev => {
+        const lastMsg = prev.find(msg => msg.id === assistantMessageId);
+        if (lastMsg) {
+          window.parent.postMessage({ type: "localmind:message", content: lastMsg.content }, "*");
+        }
+        return prev;
+      });
 
-      // Notify parent window about new message
-      window.parent.postMessage(
-        { type: "localmind:message", content: accumulated },
-        "*"
-      );
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsg.id ? { ...m, status: "completed" } : m
-          )
-        );
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        setMessages(prev => {
+          const updated = [...prev];
+          if (updated.length > 0 && updated[updated.length - 1].role === "assistant") {
+            updated[updated.length - 1].status = "cancelled";
+          }
+          return updated;
+        });
       } else {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsg.id
-              ? { ...m, content: "Sistemimizde anlık bir yoğunluk yaşıyoruz. Lütfen kısa bir süre sonra tekrar deneyebilir misiniz?", status: "failed" }
-              : m
-          )
-        );
+        console.error("Chat error:", err);
+        setMessages(prev => {
+          const updated = [...prev];
+          if (updated.length > 0 && updated[updated.length - 1].role === "assistant") {
+            updated[updated.length - 1].status = "failed";
+          }
+          return updated;
+        });
       }
     } finally {
-      setIsStreaming(false);
-      abortRef.current = null;
+      setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    sendMessage(input);
+  };
+
+  const stop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  };
+
+  useEffect(() => {
+    const handleIframeMessage = (event: MessageEvent) => {
+      if (event.data?.type === "localmind:init_context" && event.data.context) {
+        setLocalContext(event.data.context);
+      }
+    };
+    window.addEventListener("message", handleIframeMessage);
+    window.parent.postMessage({ type: "localmind:ready" }, "*");
+
+    return () => window.removeEventListener("message", handleIframeMessage);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom, isLoading]);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      if (!input.trim() || isLoading) return;
+      sendMessage(input);
     }
   };
 
-  const handleStop = () => {
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
+  const handleQuickReply = (reply: string) => {
+    if (isLoading) return;
+    sendMessage(reply);
   };
 
   return (
@@ -207,7 +205,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
         <div className="widget-header-info">
           <div className="widget-header-title">{title}</div>
           <div className="widget-header-status">
-            {isStreaming ? "Yanıtlanıyor..." : "Çevrimiçi"}
+            {isLoading ? "Yanıtlanıyor..." : "Çevrimiçi"}
           </div>
         </div>
       </div>
@@ -228,7 +226,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
               {["📦 Sipariş Durumu", "📞 İletişim Bilgileriniz", "🔄 İade ve Değişim"].map((quickReply) => (
                 <button
                   key={quickReply}
-                  onClick={() => handleSend(quickReply)}
+                  onClick={() => handleQuickReply(quickReply)}
                   style={{
                     background: "#f3f4f6",
                     border: `1px solid ${color}40`,
@@ -250,14 +248,12 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
         )}
 
         {messages.map((msg, index) => {
-          if (isStreaming && index === messages.length - 1 && msg.content === "") {
-            return null;
-          }
-          return <WidgetMessage key={msg.id} message={msg} color={color} />;
+          // ai/react returns id, role, content
+          return <WidgetMessage key={msg.id} message={{ ...msg, status: index === messages.length - 1 && isLoading ? "streaming" : "completed" }} color={color} />;
         })}
 
-        {isStreaming &&
-          messages[messages.length - 1]?.content === "" && (
+        {isLoading &&
+          messages[messages.length - 1]?.role === "user" && (
             <div className="widget-msg widget-msg-thinking">
               <span className="widget-dot" />
               <span className="widget-dot" />
@@ -270,22 +266,23 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
 
       {/* Input */}
       <div className="widget-input-area">
-        <div className="widget-input-form">
+        <form className="widget-input-form" onSubmit={handleSubmit}>
           <textarea
             ref={inputRef}
             className="widget-input"
             placeholder="Size nasıl yardımcı olabilirim?..."
             value={input}
             onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
+            onKeyDown={onKeyDown}
             rows={1}
-            disabled={isStreaming}
+            disabled={isLoading}
+            style={{ minHeight: "40px", maxHeight: "100px", resize: "none" }}
           />
-          {isStreaming ? (
+          {isLoading ? (
             <button
               className="widget-send-btn"
               style={{ background: "#ef4444" }}
-              onClick={handleStop}
+              onClick={() => stop()}
               type="button"
             >
               <svg viewBox="0 0 24 24" fill="currentColor">
@@ -296,9 +293,8 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
             <button
               className="widget-send-btn"
               style={{ background: color }}
-              onClick={handleSend}
+              type="submit"
               disabled={!input.trim()}
-              type="button"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" />
@@ -306,7 +302,7 @@ export function WidgetChat({ color, title, welcomeMessage, model, context }: Wid
               </svg>
             </button>
           )}
-        </div>
+        </form>
       </div>
 
       {/* Footer */}
