@@ -75,3 +75,12 @@ LocalMind, Next.js App Router tabanlı, yerelde çalışan bir LLM chatbot uygul
 - 2026-07-08: README ve docs incelemeleri doğrultusunda mimari özet ve önemli akışlar eklendi.
 - 2026-07-08 14:09: Chatbotun veritabanından ürün bulamaması sorunu analiz edildi ve Tool Calling entegrasyonu ile RAG sorgularındaki case-sensitivity hatalarının giderilmesini kapsayan bir uygulama planı (`implementation_plan.md`) oluşturuldu.
 - 2026-07-08 14:13: Plan onaylandı ve uygulandı. `src/app/api/chat/route.ts` dosyasına native Ollama Tool Calling entegrasyonu sağlandı. `src/app/api/widget/chat/route.ts` içerisindeki RAG sorguları `like`'tan case-insensitive `ilike`'a geçirildi. `ollama-types.ts` ve `ollama-client.ts` güncellenerek araç çağırma (tools) parametreleri aktif edildi. Tüm kod derlenerek doğrulandı.
+- 2026-07-09 10:13: Kullanıcının telefon kılıfı sorgusunun ardından veritabanı bağlantısının doğruluğu onaylandı ve açıklandı.
+- 2026-07-09 10:30: Kullanıcının widget'ı Hepsiburada web sitesi üzerinde dinamik olarak test edebilmesi için tarayıcı konsolundan script enjekte etme yöntemi açıklandı ve adım adım entegrasyon rehberi sunuldu.
+- 2026-07-09 10:37: Tarayıcıdaki CORS/Private Network Access (PNA) ve SafeFrame kaynaklı localhost engelleme sorunları için çözüm yolları (Console context kontrolü, Chrome flag devre dışı bırakma ve ngrok/localtunnel ile HTTPS tüneli) açıklandı.
+- 2026-07-09 10:43: Kullanıcıya chatbot'un verileri yerel SQLite veritabanından (sqlite.db -> products tablosu) ve script tag'i ile gönderilen data-context parametresinden aldığı açıklandı.
+- 2026-07-09 11:07: Kullanıcının chatbotu kendi web sitesine nasıl entegre edeceği ve kendi veritabanını (PostgreSQL/Drizzle) nasıl bağlayacağına dair mimari yaklaşımlar ve adım adım entegrasyon rehberi açıklandı.
+
+
+
+
