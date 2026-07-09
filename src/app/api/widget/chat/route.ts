@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { conversations, messages, products } from "@/lib/db/schema";
 import { eq, ilike } from "drizzle-orm";
 import { getSettings } from "@/lib/actions/chat";
+import { matchesProductKeyword, normalizeProductKeyword } from "@/lib/product-search";
 
 // CORS headers for external sites
 function corsHeaders(origin: string | null) {
@@ -93,6 +94,7 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
 - SIFIR HALÜSİNASYON: Sana verilen bağlam metninde/verisinde açıkça yazmayan HİÇBİR bilgiyi (renk, beden, materyal, stok durumu, fiyat, kargo süresi vb.) kendin uyduramazsın, tahmin edemezsin veya genel geçer bilgilerle dolduramazsın.
 - BİLMİYORSAN İTİRAF ET: Eğer müşteri, sana verilen verilerde bulunmayan bir özellik sorarsa (örneğin kumaş türünü soruyor ama veride kumaş türü yok), "Bu bilgiye şu an sistemimden ulaşamıyorum, kontrol edip size dönüş yapmamız için destek talebi oluşturabilirim." şeklinde net bir yanıt ver. Asla "Pamukludur" veya "Standarttır" gibi varsayımlarda bulunma.
 - VERİ SINIRLARINDA KAL: Bir ürünün 2 rengi veya bedeni varsa sadece onları söyle. Seçenekleri zenginleştirmek adına listeye fazladan renk veya beden ekleme. Ürün bedeninden bahsederken "boyun" veya "size" kelimelerini kullanma, daima "beden" de.
+- ÜRÜN VERİTABANI SONUÇLARI: Eğer ürün arama sonucu gelirse, bu sonuçlardan yararlan ve sadece bu ürünleri listele. Eğer sonuç yoksa, kullanıcıya açıkça belirt ki ürün veritabanında bulunmuyor.
 - YÖNLENDİRİCİ OL: Müşteriye doğru bilgiyi verdikten sonra, siparişi tamamlaması veya seçim yapması için kısa ve nazik bir soruyla (Örn: "Hangi bedeni tercih edersiniz?") konuşmayı devam ettir.
 - DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN. Cevaplarınızı her zaman Markdown formatında verin.`;
       if (context) {
@@ -125,20 +127,27 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
       });
       
       const intentData = await ollamaRes.json();
-      const intentKeyword = intentData.message?.content?.trim().toLowerCase() || "null";
-      if (intentKeyword && intentKeyword !== "null" && intentKeyword.length > 2) {
-        const cleanKeyword = intentKeyword.replace(/['"._]/g, '').trim();
-        const searchResults = await db.select().from(products).where(ilike(products.name, `%${cleanKeyword}%`)).limit(5);
-        
-        if (searchResults.length > 0) {
+      const intentKeyword = intentData.message?.content?.trim() || "null";
+      const normalizedIntent = normalizeProductKeyword(intentKeyword);
+
+      if (intentKeyword && intentKeyword !== "null" && normalizedIntent.length > 2) {
+        const searchResults = await db.select().from(products).limit(50);
+        const matchedProducts = searchResults.filter((product) => matchesProductKeyword(normalizedIntent, product.name));
+
+        if (matchedProducts.length > 0) {
           let ragContext = "\n\nSİSTEM BİLGİSİ (Ürünler Bulundu): Kullanıcıya kibarca ürünleri bulduğunuzu söyleyin ve hemen ardından AŞAĞIDAKİ SATIRLARI HİÇBİR DEĞİŞİKLİK YAPMADAN, BİREBİR KOPYALAYIP CEVABINIZA EKLAYİN (Çok Önemli):\n\n";
-          searchResults.forEach(p => {
+          matchedProducts.slice(0, 5).forEach((p) => {
             const encRating = encodeURIComponent(p.rating || "");
             const encEmoji = encodeURIComponent(p.emoji || "");
             const sizesInfo = p.sizes ? `Mevcut Bedenler: ${p.sizes}` : "Beden bilgisi yok";
             ragContext += `[${p.name}](#product:${p.id}:${p.price}:${p.oldPrice}:${encRating}:${encEmoji})\n(Sistem İçi Bilgi - Kullanıcıya söyleyebilirsin: ${sizesInfo})\n\n`;
           });
           chatHistory.push({ role: "system", content: ragContext });
+        } else {
+          chatHistory.push({
+            role: "system",
+            content: "Ürün veritabanında eşleşme bulunamadı. Kullanıcıya ürün bilgisi olmadığını açıkça söyle ve destek talebi oluşturulabileceğini belirt."
+          });
         }
       }
     } catch (e) {
