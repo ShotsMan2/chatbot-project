@@ -80,7 +80,6 @@ LocalMind, Next.js App Router tabanlı, yerelde çalışan bir LLM chatbot uygul
 - 2026-07-09 10:37: Tarayıcıdaki CORS/Private Network Access (PNA) ve SafeFrame kaynaklı localhost engelleme sorunları için çözüm yolları (Console context kontrolü, Chrome flag devre dışı bırakma ve ngrok/localtunnel ile HTTPS tüneli) açıklandı.
 - 2026-07-09 10:43: Kullanıcıya chatbot'un verileri yerel SQLite veritabanından (sqlite.db -> products tablosu) ve script tag'i ile gönderilen data-context parametresinden aldığı açıklandı.
 - 2026-07-09 11:07: Kullanıcının chatbotu kendi web sitesine nasıl entegre edeceği ve kendi veritabanını (PostgreSQL/Drizzle) nasıl bağlayacağına dair mimari yaklaşımlar ve adım adım entegrasyon rehberi açıklandı.
-
-
-
-
+- 2026-07-10 21:48: Kullanıcının chatbot entegrasyonu sonrası hangi projede ve hangi durumlarda "npm run dev" çalıştırması gerektiği sorusu açıklandı.
+- 2026-07-10 21:55: Chatbot'u e-ticaret sitelerine bir SaaS modeli olarak satmak isteyen kullanıcıya Yöntem A'nın (SaaS / Standalone API) avantajları ve bu modeli ölçeklendirmek için izlemesi gereken mimari adımlar açıklandı.
+- 2026-07-10 22:22: Kullanıcının kendi modelini eğitmek yerine hazır LLM'leri (OpenAI, Gemini vb.) bağlayıp e-ticarete özel (RAG + Tool Calling) ayarlama mimarisinin mantığına dair stratejik ve mimari analiz sunuldu.
