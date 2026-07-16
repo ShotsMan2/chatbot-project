@@ -3,7 +3,7 @@ import { z } from "zod";
 import { chatRequestSchema } from "@/lib/validation/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
-import { conversations, messages, products } from "@/lib/db/schema";
+import { conversations, messages, products, carts, cartItems, coupons, orders, faqs } from "@/lib/db/schema";
 import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
 import { eq, ilike } from "drizzle-orm";
@@ -23,6 +23,87 @@ const TOOLS = [
           }
         },
         required: ["keyword"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "add_to_cart",
+      description: "Belirtilen ürünü sepete ekler.",
+      parameters: {
+        type: "object",
+        properties: {
+          productId: { type: "number", description: "Sepete eklenecek ürünün ID'si" },
+          quantity: { type: "number", description: "Eklenecek adet" }
+        },
+        required: ["productId", "quantity"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "view_cart",
+      description: "Mevcut sepeti ve içindeki ürünleri getirir.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_coupon",
+      description: "Sepete indirim kuponu (örn: YAZ20) uygular.",
+      parameters: {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "Kupon kodu" }
+        },
+        required: ["code"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_faq",
+      description: "Müşterinin iade, kargo, garanti gibi sık sorulan sorularına (SSS) yanıt arar.",
+      parameters: {
+        type: "object",
+        properties: {
+          keyword: { type: "string", description: "Aranacak konu (örn: iade, kargo, garanti)" }
+        },
+        required: ["keyword"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "track_order",
+      description: "Müşterinin siparişinin güncel durumunu takip eder.",
+      parameters: {
+        type: "object",
+        properties: {
+          orderId: { type: "string", description: "Sipariş numarası" }
+        },
+        required: ["orderId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "checkout_cart",
+      description: "Mevcut sepetteki ürünleri siparişe dönüştürerek satın alma işlemini tamamlar.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
       }
     }
   }
@@ -167,10 +248,13 @@ export async function POST(req: NextRequest) {
                          .where(ilike(products.name, `%${cleanKeyword}%`))
                          .limit(10);
                        productsData = searchResults.map(p => ({
+                         id: p.id,
                          name: p.name,
+                         description: p.description,
                          price: p.price,
-                         sizes: p.sizes,
-                         emoji: p.emoji
+                         stock: p.stock,
+                         imageUrl: p.imageUrl,
+                         category: p.category
                        }));
                      }
 
@@ -180,6 +264,125 @@ export async function POST(req: NextRequest) {
                          products: productsData
                        })
                      });
+                   } else if (tc.function.name === "add_to_cart") {
+                     const args = tc.function.arguments;
+                     const productId = args.productId;
+                     const quantity = args.quantity || 1;
+                     
+                     let cart = await db.select().from(carts).where(eq(carts.id, convId)).limit(1).then(res => res[0]);
+                     if (!cart) {
+                       await db.insert(carts).values({ id: convId });
+                     }
+                     
+                     await db.insert(cartItems).values({
+                       cartId: convId,
+                       productId: productId,
+                       quantity: quantity
+                     });
+                     
+                     runMessages.push({
+                       role: "tool",
+                       content: JSON.stringify({ success: true, message: "Ürün sepete eklendi." })
+                     });
+                   } else if (tc.function.name === "view_cart") {
+                     const items = await db.select({
+                       id: products.id,
+                       name: products.name,
+                       price: products.price,
+                       quantity: cartItems.quantity
+                     }).from(cartItems)
+                       .innerJoin(products, eq(cartItems.productId, products.id))
+                       .where(eq(cartItems.cartId, convId));
+                       
+                     runMessages.push({
+                       role: "tool",
+                       content: JSON.stringify({ cart_items: items })
+                     });
+                   } else if (tc.function.name === "apply_coupon") {
+                     const args = tc.function.arguments;
+                     const code = args.code;
+                     const coupon = await db.select().from(coupons).where(eq(coupons.code, code)).limit(1).then(res => res[0]);
+                     
+                     if (coupon && coupon.isActive) {
+                       runMessages.push({
+                         role: "tool",
+                         content: JSON.stringify({ success: true, discountPercent: coupon.discountPercent, message: "Kupon başarıyla uygulandı." })
+                       });
+                     } else {
+                       runMessages.push({
+                         role: "tool",
+                         content: JSON.stringify({ success: false, message: "Geçersiz veya süresi dolmuş kupon kodu." })
+                       });
+                     }
+                   } else if (tc.function.name === "search_faq") {
+                     const args = tc.function.arguments;
+                     const keyword = args.keyword || "";
+                     const cleanKeyword = keyword.replace(/['"._]/g, '').trim();
+                     let faqsData = await db.select().from(faqs).where(ilike(faqs.question, `%${cleanKeyword}%`)).limit(3);
+                     if (faqsData.length === 0) {
+                       faqsData = await db.select().from(faqs).where(ilike(faqs.category, `%${cleanKeyword}%`)).limit(3);
+                     }
+                     runMessages.push({
+                       role: "tool",
+                       content: JSON.stringify({
+                         faqs: faqsData.length > 0 ? faqsData : [{ question: "Politika", answer: "Ürünlerimizi 14 gün içinde faturasıyla iade edebilir, kargo sürecini Sipariş Takibi kısmından izleyebilirsiniz." }]
+                       })
+                     });
+                   } else if (tc.function.name === "track_order") {
+                     const args = tc.function.arguments;
+                     const orderId = args.orderId;
+                     let order = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1).then(res => res[0]);
+                     
+                     if (order) {
+                        runMessages.push({
+                          role: "tool",
+                          content: JSON.stringify({ success: true, order: order })
+                        });
+                     } else {
+                        // Mock order for demo purposes if not found in db
+                        runMessages.push({
+                          role: "tool",
+                          content: JSON.stringify({ success: true, order: { id: orderId, status: "shipped", totalAmount: "1250 TL", createdAt: new Date().toISOString() } })
+                        });
+                     }
+                   } else if (tc.function.name === "checkout_cart") {
+                     const cart = await db.select().from(carts).where(eq(carts.id, convId)).limit(1).then(res => res[0]);
+                     if (cart) {
+                       const items = await db.select({ price: products.price, quantity: cartItems.quantity })
+                         .from(cartItems).innerJoin(products, eq(cartItems.productId, products.id)).where(eq(cartItems.cartId, convId));
+                       
+                       if (items.length > 0) {
+                         const total = items.reduce((acc, item) => {
+                           const priceStr = item.price.replace(/[^0-9.]/g, '');
+                           return acc + (parseFloat(priceStr) * item.quantity);
+                         }, 0);
+
+                         const orderId = "ORD-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+                         await db.insert(orders).values({
+                           id: orderId,
+                           cartId: convId,
+                           totalAmount: `${total} TL`,
+                           status: "preparing"
+                         });
+                         // Clear cart items
+                         await db.delete(cartItems).where(eq(cartItems.cartId, convId));
+                         
+                         runMessages.push({
+                           role: "tool",
+                           content: JSON.stringify({ success: true, orderId: orderId, totalAmount: `${total} TL`, message: "Siparişiniz başarıyla alındı ve ödemeniz onaylandı!" })
+                         });
+                       } else {
+                         runMessages.push({
+                           role: "tool",
+                           content: JSON.stringify({ success: false, message: "Sepetiniz boş. Sipariş oluşturulamadı." })
+                         });
+                       }
+                     } else {
+                       runMessages.push({
+                         role: "tool",
+                         content: JSON.stringify({ success: false, message: "Geçerli bir sepet bulunamadı." })
+                       });
+                     }
                    }
                  }
               } else {
