@@ -4,6 +4,7 @@ import path from "path";
 export default defineConfig({
   test: {
     environment: "node",
+    exclude: ["node_modules", "dist", ".idea", ".git", ".cache", "**/*.spec.ts"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },

@@ -137,10 +137,9 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
         if (matchedProducts.length > 0) {
           let ragContext = "\n\nSİSTEM BİLGİSİ (Ürünler Bulundu): Kullanıcıya kibarca ürünleri bulduğunuzu söyleyin ve hemen ardından AŞAĞIDAKİ SATIRLARI HİÇBİR DEĞİŞİKLİK YAPMADAN, BİREBİR KOPYALAYIP CEVABINIZA EKLAYİN (Çok Önemli):\n\n";
           matchedProducts.slice(0, 5).forEach((p) => {
-            const encRating = encodeURIComponent(p.rating || "");
-            const encEmoji = encodeURIComponent(p.emoji || "");
-            const sizesInfo = p.sizes ? `Mevcut Bedenler: ${p.sizes}` : "Beden bilgisi yok";
-            ragContext += `[${p.name}](#product:${p.id}:${p.price}:${p.oldPrice}:${encRating}:${encEmoji})\n(Sistem İçi Bilgi - Kullanıcıya söyleyebilirsin: ${sizesInfo})\n\n`;
+            const categoryInfo = p.category || "Genel";
+            const stockInfo = p.stock > 0 ? `${p.stock} adet stokta` : "Stokta yok";
+            ragContext += `[${p.name}](#product:${p.id}:${p.price})\n(Sistem İçi Bilgi - Kullanıcıya söyleyebilirsin: Kategori: ${categoryInfo}, Stok: ${stockInfo})\n\n`;
           });
           chatHistory.push({ role: "system", content: ragContext });
         } else {

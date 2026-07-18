@@ -33,7 +33,7 @@ export async function clearAllConversations() {
 export async function getSettings() {
   let setting = await db.select().from(settings).where(eq(settings.id, 1)).limit(1).then((res) => res[0]);
   if (!setting) {
-    await db.insert(settings).values({ id: 1 }).execute();
+    await db.insert(settings).values({ id: 1 }).onConflictDoNothing().execute();
     setting = await db.select().from(settings).where(eq(settings.id, 1)).limit(1).then((res) => res[0]);
   }
   return setting!;

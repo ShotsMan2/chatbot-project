@@ -3,6 +3,7 @@
 import { Message } from "./chat-container";
 import ReactMarkdown from "react-markdown";
 import { CodeBlock } from "./code-block";
+import { ProductCard, ProductCarousel, CartCard, CouponCard, OrderTimelineCard, ReviewCard, SupportTicketCard, NegotiationCard, RegistryCard, ArCard } from "./ui-cards";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Copy, RefreshCw, AlertCircle, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,50 @@ export function MessageItem({ message }: MessageItemProps) {
                     const match = /language-(\w+)/.exec(className || "");
                     const isInline = inline || !match;
                     if (!isInline && match) {
+                      try {
+                        if (match[1] === "json-product") {
+                          const data = JSON.parse(String(children));
+                          return <ProductCard data={data} />;
+                        }
+                        if (match[1] === "json-products") {
+                          const data = JSON.parse(String(children));
+                          return <ProductCarousel data={data} />;
+                        }
+                        if (match[1] === "json-cart") {
+                          const data = JSON.parse(String(children));
+                          return <CartCard data={data} />;
+                        }
+                        if (match[1] === "json-coupon") {
+                          const data = JSON.parse(String(children));
+                          return <CouponCard data={data} />;
+                        }
+                        if (match[1] === "json-order") {
+                          const data = JSON.parse(String(children));
+                          return <OrderTimelineCard data={data} />;
+                        }
+                        if (match[1] === "json-reviews") {
+                          const data = JSON.parse(String(children));
+                          return <ReviewCard data={data} />;
+                        }
+                        if (match[1] === "json-ticket") {
+                          const data = JSON.parse(String(children));
+                          return <SupportTicketCard data={data} />;
+                        }
+                        if (match[1] === "json-negotiation") {
+                          const data = JSON.parse(String(children));
+                          return <NegotiationCard data={data} />;
+                        }
+                        if (match[1] === "json-registry") {
+                          const data = JSON.parse(String(children));
+                          return <RegistryCard data={data} />;
+                        }
+                        if (match[1] === "json-ar") {
+                          const data = JSON.parse(String(children));
+                          return <ArCard data={data} />;
+                        }
+                      } catch (e) {
+                        // ignore parse error, fallback to code block
+                      }
                       return (
                         <CodeBlock
                           language={match[1]}

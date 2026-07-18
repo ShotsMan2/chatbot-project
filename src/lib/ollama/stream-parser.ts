@@ -5,6 +5,10 @@ export async function* parseOllamaStream(
   const decoder = new TextDecoder("utf-8");
   let buffer = "";
 
+  let inJsonBlock = false;
+  let jsonBuffer = "";
+  let blockType = "";
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -13,8 +17,6 @@ export async function* parseOllamaStream(
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
 
-      // The last element is either an empty string (if the buffer ended with \n)
-      // or a partial JSON string. We keep it in the buffer.
       buffer = lines.pop() || "";
 
       for (const line of lines) {
@@ -22,16 +24,63 @@ export async function* parseOllamaStream(
         if (!trimmed) continue;
         try {
           const parsed = JSON.parse(trimmed);
+          
+          if (parsed.message?.content) {
+            const content = parsed.message.content;
+            
+            // Check for start of JSON block
+            if (!inJsonBlock && content.includes("```json-")) {
+              const match = content.match(/```json-([a-z]+)/);
+              if (match) {
+                inJsonBlock = true;
+                blockType = match[1];
+                jsonBuffer = content.split(/```json-[a-z]+/).pop() || "";
+                
+                // If it also closes in the same chunk
+                if (jsonBuffer.includes("```")) {
+                  inJsonBlock = false;
+                  const jsonStr = jsonBuffer.split("```")[0];
+                  try {
+                    const data = JSON.parse(jsonStr);
+                    yield { type: blockType, data };
+                  } catch(e) {}
+                  jsonBuffer = "";
+                }
+                
+                // Yield the text part before the block
+                const textBefore = content.split(/```json-[a-z]+/)[0];
+                if (textBefore) {
+                  yield { ...parsed, message: { ...parsed.message, content: textBefore } };
+                }
+                continue;
+              }
+            } else if (inJsonBlock) {
+              jsonBuffer += content;
+              if (jsonBuffer.includes("```")) {
+                inJsonBlock = false;
+                const jsonStr = jsonBuffer.split("```")[0];
+                try {
+                  const data = JSON.parse(jsonStr);
+                  yield { type: blockType, data };
+                } catch(e) {}
+                
+                const textAfter = jsonBuffer.split("```")[1] || "";
+                if (textAfter) {
+                  yield { ...parsed, message: { ...parsed.message, content: textAfter } };
+                }
+                jsonBuffer = "";
+              }
+              continue; // Do not yield the raw content while inside JSON block
+            }
+          }
+
           yield parsed;
         } catch (e) {
           console.warn("Failed to parse stream line:", trimmed, e);
-          // If JSON parse fails, it means the chunk might be corrupt or we split it improperly.
-          // However, we strictly split on \n, and NDJSON guarantees \n at the end of each valid object.
         }
       }
     }
 
-    // Process any remaining data in the buffer after the stream ends
     if (buffer.trim()) {
       try {
         const parsed = JSON.parse(buffer.trim());

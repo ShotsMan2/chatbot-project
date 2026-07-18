@@ -117,6 +117,13 @@ export function ChatContainer({
                   ? { ...msg, content: accumulatedContent } 
                   : msg
               ));
+            } else if (parsed.type) {
+              accumulatedContent += `\n\`\`\`json-${parsed.type}\n${JSON.stringify(parsed.data)}\n\`\`\`\n`;
+              setMessages(prev => prev.map(msg => 
+                msg.id === returnedMsgId 
+                  ? { ...msg, content: accumulatedContent } 
+                  : msg
+              ));
             }
           } catch (e) {
             // parsing error on partial NDJSON chunk
