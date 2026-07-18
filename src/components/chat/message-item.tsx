@@ -3,7 +3,7 @@
 import { Message } from "./chat-container";
 import ReactMarkdown from "react-markdown";
 import { CodeBlock } from "./code-block";
-import { ProductCard, ProductCarousel, CartCard, CouponCard, OrderTimelineCard } from "./ui-cards";
+import { ProductCard, ProductCarousel, CartCard, CouponCard, OrderTimelineCard, ReviewCard, SupportTicketCard, NegotiationCard, RegistryCard, ArCard } from "./ui-cards";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Copy, RefreshCw, AlertCircle, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,26 @@ export function MessageItem({ message }: MessageItemProps) {
                         if (match[1] === "json-order") {
                           const data = JSON.parse(String(children));
                           return <OrderTimelineCard data={data} />;
+                        }
+                        if (match[1] === "json-reviews") {
+                          const data = JSON.parse(String(children));
+                          return <ReviewCard data={data} />;
+                        }
+                        if (match[1] === "json-ticket") {
+                          const data = JSON.parse(String(children));
+                          return <SupportTicketCard data={data} />;
+                        }
+                        if (match[1] === "json-negotiation") {
+                          const data = JSON.parse(String(children));
+                          return <NegotiationCard data={data} />;
+                        }
+                        if (match[1] === "json-registry") {
+                          const data = JSON.parse(String(children));
+                          return <RegistryCard data={data} />;
+                        }
+                        if (match[1] === "json-ar") {
+                          const data = JSON.parse(String(children));
+                          return <ArCard data={data} />;
                         }
                       } catch (e) {
                         // ignore parse error, fallback to code block

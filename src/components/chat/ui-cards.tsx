@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ShoppingBag, ShoppingCart, Tag, Package, CheckCircle2, Truck, CreditCard, Plus } from "lucide-react";
+import { ShoppingBag, ShoppingCart, Tag, Package, CheckCircle2, Truck, CreditCard, Plus, Star, Headphones } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { addToCartAction } from "@/lib/actions/cart";
@@ -185,6 +185,112 @@ export function OrderTimelineCard({ data }: { data: any }) {
           <p className={`font-bold text-sm ${isDelivered ? '' : 'text-muted-foreground'}`}>Teslim Edildi</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function ReviewCard({ data }: { data: any }) {
+  const reviews = data.reviews || [];
+  if (reviews.length === 0) return null;
+
+  return (
+    <div className="relative p-4 my-2 border border-yellow-500/20 rounded-2xl bg-gradient-to-br from-yellow-50 to-white dark:from-yellow-950/20 dark:to-black/40 backdrop-blur-md shadow-lg max-w-sm">
+      <div className="flex items-center gap-2 mb-3 border-b border-yellow-500/10 pb-2">
+        <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+        <span className="font-bold text-sm">Müşteri Yorumları</span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {reviews.map((rev: any, idx: number) => (
+          <div key={idx} className="bg-white/50 dark:bg-black/30 p-3 rounded-xl shadow-sm text-sm">
+            <div className="flex items-center gap-1 mb-1 text-yellow-500">
+              {Array.from({ length: rev.rating || 5 }).map((_, i) => (
+                <Star key={i} className="h-3 w-3 fill-current" />
+              ))}
+            </div>
+            <p className="text-muted-foreground italic line-clamp-3">"{rev.comment}"</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SupportTicketCard({ data }: { data: any }) {
+  return (
+    <div className="relative p-5 my-3 border border-blue-500/30 rounded-2xl bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/10 backdrop-blur-xl shadow-lg max-w-sm overflow-hidden">
+      <div className="absolute top-0 right-0 p-4 opacity-10">
+        <Headphones className="h-16 w-16 text-blue-500" />
+      </div>
+      <div className="flex items-center gap-3 mb-2 z-10 relative">
+        <div className="p-2 bg-blue-500/20 rounded-full text-blue-600 dark:text-blue-400">
+          <Headphones className="h-5 w-5" />
+        </div>
+        <span className="font-bold text-blue-900 dark:text-blue-100 text-lg">Destek Talebi</span>
+      </div>
+      <div className="z-10 relative space-y-1">
+        <p className="text-sm font-medium text-blue-800/80 dark:text-blue-200/80">Bilet No: <span className="font-bold">{data.ticketId}</span></p>
+        <p className="text-xs text-blue-700/70 dark:text-blue-300/70">{data.message}</p>
+        <div className="mt-3 flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 w-fit px-3 py-1.5 rounded-lg">
+          <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse" />
+          Müşteri temsilcisi bağlanıyor...
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function NegotiationCard({ data }: { data: any }) {
+  return (
+    <div className="relative p-5 my-3 border border-green-500/30 rounded-2xl bg-gradient-to-r from-green-50 to-green-100/50 dark:from-green-950/40 dark:to-green-900/10 backdrop-blur-xl shadow-lg max-w-sm">
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 bg-green-500/20 rounded-full text-green-600 dark:text-green-400">
+          <Tag className="h-5 w-5" />
+        </div>
+        <span className="font-bold text-green-900 dark:text-green-100 text-lg">Özel Teklif</span>
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm line-through text-muted-foreground">{data.originalPrice}</p>
+        <p className="text-xl font-black text-green-600 dark:text-green-400">{data.acceptedPrice}</p>
+        {data.couponCode && (
+          <div className="mt-2 text-xs font-mono bg-background p-2 rounded border border-green-500/20 text-center">
+            Kupon: <b>{data.couponCode}</b>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function RegistryCard({ data }: { data: any }) {
+  return (
+    <div className="relative p-5 my-3 border border-pink-500/30 rounded-2xl bg-gradient-to-r from-pink-50 to-pink-100/50 dark:from-pink-950/40 dark:to-pink-900/10 backdrop-blur-xl shadow-lg max-w-sm text-center">
+      <div className="mx-auto w-fit p-3 bg-pink-500/20 rounded-full text-pink-600 dark:text-pink-400 mb-3">
+        <CheckCircle2 className="h-6 w-6" />
+      </div>
+      <h3 className="font-bold text-pink-900 dark:text-pink-100 text-lg">{data.eventName}</h3>
+      <p className="text-sm text-pink-700/70 dark:text-pink-300/70 mb-3">Hediye Listeniz Oluşturuldu</p>
+      {data.link && (
+        <a href={data.link} target="_blank" rel="noreferrer" className="inline-block bg-pink-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:scale-105 transition-transform">
+          Listeye Git
+        </a>
+      )}
+    </div>
+  );
+}
+
+export function ArCard({ data }: { data: any }) {
+  return (
+    <div className="relative p-5 my-3 border border-purple-500/30 rounded-2xl bg-gradient-to-r from-purple-50 to-purple-100/50 dark:from-purple-950/40 dark:to-purple-900/10 backdrop-blur-xl shadow-lg max-w-sm text-center">
+      <div className="mx-auto w-fit p-3 bg-purple-500/20 rounded-full text-purple-600 dark:text-purple-400 mb-3">
+        <Package className="h-6 w-6" />
+      </div>
+      <h3 className="font-bold text-purple-900 dark:text-purple-100 text-lg">Sanal Deneme (AR)</h3>
+      <p className="text-sm text-purple-700/70 dark:text-purple-300/70 mb-3">Bu ürünü evinizde veya üzerinizde görün.</p>
+      {data.modelUrl && (
+        <a href={data.modelUrl} target="_blank" rel="noreferrer" className="inline-block bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:scale-105 transition-transform">
+          {data.buttonText || "Hemen Dene 👓"}
+        </a>
+      )}
     </div>
   );
 }
