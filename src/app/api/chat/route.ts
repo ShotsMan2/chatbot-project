@@ -530,9 +530,11 @@ export async function POST(req: NextRequest) {
                  } as any);
                  
                  for (const tc of currentToolCalls) {
-                   if (tc.function.name === "search_products") {
-                     const args = tc.function.arguments;
-                     const keyword = args.keyword || "";
+                    const parseArgs = (raw: any) => typeof raw === "string" ? JSON.parse(raw) : raw;
+
+                    if (tc.function.name === "search_products") {
+                      const args = parseArgs(tc.function.arguments);
+                      const keyword = args.keyword || "";
                      const cleanKeyword = keyword.replace(/['"._]/g, '').trim();
                      let productsData: any[] = [];
                      
@@ -559,7 +561,7 @@ export async function POST(req: NextRequest) {
                        })
                      });
                    } else if (tc.function.name === "add_to_cart") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const productId = args.productId;
                      const quantity = args.quantity || 1;
                      
@@ -593,7 +595,7 @@ export async function POST(req: NextRequest) {
                        content: JSON.stringify({ cart_items: items })
                      });
                    } else if (tc.function.name === "apply_coupon") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const code = args.code;
                      const coupon = await db.select().from(coupons).where(eq(coupons.code, code)).limit(1).then(res => res[0]);
                      
@@ -609,7 +611,7 @@ export async function POST(req: NextRequest) {
                        });
                      }
                    } else if (tc.function.name === "search_faq") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const keyword = args.keyword || "";
                      const cleanKeyword = keyword.replace(/['"._]/g, '').trim();
                      let faqsData = await db.select().from(faqs).where(ilike(faqs.question, `%${cleanKeyword}%`)).limit(3);
@@ -623,7 +625,7 @@ export async function POST(req: NextRequest) {
                        })
                      });
                    } else if (tc.function.name === "track_order") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const orderId = args.orderId;
                      let order = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1).then(res => res[0]);
                      
@@ -678,7 +680,7 @@ export async function POST(req: NextRequest) {
                        });
                      }
                    } else if (tc.function.name === "get_product_reviews") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const prodId = args.productId;
                      const productReviews = await db.select().from(reviews).where(eq(reviews.productId, prodId)).limit(5);
                      runMessages.push({
@@ -688,7 +690,7 @@ export async function POST(req: NextRequest) {
                        })
                      });
                    } else if (tc.function.name === "recommend_similar_products") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const category = args.category || "general";
                      const recommendations = await db.select().from(products).where(ilike(products.category, `%${category}%`)).limit(3);
                      runMessages.push({
@@ -696,7 +698,7 @@ export async function POST(req: NextRequest) {
                        content: JSON.stringify({ recommendations: recommendations })
                      });
                    } else if (tc.function.name === "escalate_to_human") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const issue = args.issue || "Destek talebi";
                      const ticketId = "TCK-" + Math.random().toString(36).substring(2, 8).toUpperCase();
                      await db.insert(supportTickets).values({
@@ -719,7 +721,7 @@ export async function POST(req: NextRequest) {
                        content: JSON.stringify({ success: true, points: user.loyaltyPoints, message: `Mevcut sadakat puanınız: ${user.loyaltyPoints} Puan. (Her 100 puan 10 TL indirim sağlar)` })
                      });
                    } else if (tc.function.name === "process_return") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const rmaId = "RMA-" + Math.random().toString(36).substring(2, 8).toUpperCase();
                      await db.insert(returns).values({
                        id: rmaId,
@@ -733,7 +735,7 @@ export async function POST(req: NextRequest) {
                        content: JSON.stringify({ success: true, returnId: rmaId, message: "İade/Değişim (RMA) talebiniz başarıyla alındı. Lütfen kargolama talimatlarını e-postanızdan kontrol edin." })
                      });
                    } else if (tc.function.name === "request_b2b_quote") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const quoteId = "B2B-" + Math.random().toString(36).substring(2, 8).toUpperCase();
                      await db.insert(b2bQuotes).values({
                        id: quoteId,
@@ -780,7 +782,7 @@ export async function POST(req: NextRequest) {
                        });
                      }
                    } else if (tc.function.name === "create_subscription") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const subId = "SUB-" + Math.random().toString(36).substring(2, 8).toUpperCase();
                      
                      // Calculate next delivery date (assume +1 month for default)
@@ -801,7 +803,7 @@ export async function POST(req: NextRequest) {
                        content: JSON.stringify({ success: true, subscriptionId: subId, message: "Abonelik başarıyla oluşturuldu. Ürün düzenli olarak adresinize gönderilecektir." })
                      });
                    } else if (tc.function.name === "add_to_wishlist") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      
                      let wishlist = await db.select().from(wishlists).where(eq(wishlists.userId, convId)).limit(1).then(res => res[0]);
                      if (!wishlist) {
@@ -888,7 +890,7 @@ export async function POST(req: NextRequest) {
                         });
                      }
                    } else if (tc.function.name === "negotiate_price") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      // Basit bir pazarlık simülasyonu
                      const proposedPrice = parseFloat(args.proposedPrice.replace(/[^0-9.]/g, ''));
                      let product = await db.select().from(products).where(eq(products.id, args.productId)).limit(1).then(res => res[0]);
@@ -943,7 +945,7 @@ export async function POST(req: NextRequest) {
                         });
                      }
                    } else if (tc.function.name === "create_gift_registry") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const registryId = "REG-" + Math.random().toString(36).substring(2, 8).toUpperCase();
                      
                      await db.insert(giftRegistries).values({
@@ -964,7 +966,7 @@ export async function POST(req: NextRequest) {
                        })
                      });
                    } else if (tc.function.name === "add_to_registry") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      runMessages.push({
                        role: "tool",
                        content: JSON.stringify({ 
@@ -975,7 +977,7 @@ export async function POST(req: NextRequest) {
                        })
                      });
                    } else if (tc.function.name === "view_ar_model") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      // Mock AR Model
                      runMessages.push({
                        role: "tool",
@@ -986,7 +988,7 @@ export async function POST(req: NextRequest) {
                        })
                      });
                    } else if (tc.function.name === "consult_expert_agent") {
-                     const args = tc.function.arguments;
+                     const args = parseArgs(tc.function.arguments);
                      const expertName = args.expertType === 'tech_expert' ? 'Devin AI (Teknoloji Uzmanı)' : 'Copilot (Stil Danışmanı)';
                      runMessages.push({
                        role: "tool",
