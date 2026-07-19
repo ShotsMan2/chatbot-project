@@ -6,7 +6,12 @@ import { db } from "@/lib/db";
 import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, users, reviews, supportTickets, returns, b2bQuotes, subscriptions, wishlists, wishlistItems, flashSales, analyticsEvents, negotiations, giftRegistries, giftContributions, productArAssets } from "@/lib/db/schema";
 import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
-import { eq, ilike } from "drizzle-orm";
+import { eq, ilike, or, sql } from "drizzle-orm";
+
+// SQL'de Türkçe karakterleri normalize eden helper (ı,ğ,ü,ş,ö,ç → i,g,u,s,o,c)
+function likeNormalized(col: any, pattern: string) {
+  return sql`LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${col}, 'ı', 'i'), 'ğ', 'g'), 'ü', 'u'), 'ş', 's'), 'ö', 'o'), 'ç', 'c')) LIKE ${pattern}`;
+}
 
 const TOOLS = [
   {
@@ -460,6 +465,52 @@ export async function POST(req: NextRequest) {
         ...chatMessages.filter((m: any) => m.role !== "system")
       ] as import("@/lib/ollama/ollama-types").ChatMessage[];
 
+      // Pre-search RAG: Her mesajda normalize edilmiş tokenlarla veritabanında ürün ara
+      const lastMsg = lastUserMessage?.content || "";
+      let preSearchedProducts: any[] = [];
+      const normalizeTurkish = (s: string) =>
+        s.replace(/['"._\-/\\()\[\]{}]/g, '')
+         .replace(/ı/g, 'i').replace(/İ/g, 'i')
+         .replace(/ü/g, 'u').replace(/Ü/g, 'u')
+         .replace(/ö/g, 'o').replace(/Ö/g, 'o')
+         .replace(/ç/g, 'c').replace(/Ç/g, 'c')
+         .replace(/ş/g, 's').replace(/Ş/g, 's')
+         .replace(/ğ/g, 'g').replace(/Ğ/g, 'g')
+         .trim().toLowerCase();
+      const kw = normalizeTurkish(lastMsg);
+      const stopWords = new Set(["ne","kadar","kac","kaç","fiyat","ne kadar","nerede","nasil","nasıl","kac para","kaç para","var mi","var mı","göster","goster","bul","ara","acaba","lütfen","lutfen","istiyorum","bana","ben","bu","su","şu","ve","ile","bir","o","ama","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","nasılsın","nasilsin","merhaba","selam","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki"]);
+      const tokens = kw.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t));
+      if (tokens.length > 0) {
+        const conditions = tokens.flatMap((t: string) => [
+          likeNormalized(products.name, `%${t}%`),
+          likeNormalized(products.description, `%${t}%`),
+          likeNormalized(products.category, `%${t}%`)
+        ]);
+        preSearchedProducts = (await db.select()
+          .from(products)
+          .where(or(...conditions))
+          .limit(10)
+        ).map(p => ({
+          id: p.id, name: p.name, description: p.description,
+          price: p.price, stock: p.stock, imageUrl: p.imageUrl, category: p.category
+        }));
+        if (preSearchedProducts.length > 0) {
+          messagesWithSystem[0] = {
+            role: "system",
+            content: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT + `\n\n# !!! ACİL TALİMAT: KESİNLİKLE OKU !!!
+Aşağıda Önceden Getirilmiş Ürünler listesi var. Kullanıcının sorusu bu ürünlerle ilgiliyse:
+
+1. search_products aracını KESİNLİKLE ÇAĞIRMA.
+2. Cevabında \`\`\`json veya \`\`\`javascript veya hiçbir kod bloğu KULLANMA.
+3. Doğrudan düz metinle, doğal bir satış diliyle cevap ver.
+4. search_products için JSON yazma. Sadece verilen listedeki veriyi kullan.
+
+# Önceden Getirilmiş Ürünler
+${JSON.stringify(preSearchedProducts, null, 2)}`
+          };
+        }
+      }
+
       const wrappedStream = new ReadableStream({
         async start(controller) {
           try {
@@ -535,31 +586,41 @@ export async function POST(req: NextRequest) {
                     if (tc.function.name === "search_products") {
                       const args = parseArgs(tc.function.arguments);
                       const keyword = args.keyword || "";
-                     const cleanKeyword = keyword.replace(/['"._]/g, '').trim();
-                     let productsData: any[] = [];
-                     
-                     if (cleanKeyword.length > 2) {
-                       const searchResults = await db.select()
-                         .from(products)
-                         .where(ilike(products.name, `%${cleanKeyword}%`))
-                         .limit(10);
-                       productsData = searchResults.map(p => ({
-                         id: p.id,
-                         name: p.name,
-                         description: p.description,
-                         price: p.price,
-                         stock: p.stock,
-                         imageUrl: p.imageUrl,
-                         category: p.category
-                       }));
-                     }
+                      const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "ne kadar", "ne kadar", "nerede", "nasil", "nasıl", "kac para", "kaç para", "var mi", "var mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben"]);
+                      let cleanKeyword = keyword.replace(/['"._?!]/g, ' ').trim().toLowerCase();
+                      cleanKeyword = cleanKeyword
+                        .replace(/[ç]/g, 'c').replace(/[ğ]/g, 'g').replace(/[ı]/g, 'i')
+                        .replace(/[ö]/g, 'o').replace(/[ş]/g, 's').replace(/[ü]/g, 'u');
+                      const tokens = cleanKeyword.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t));
+                      let productsData: any[] = [];
+                      
+                       if (tokens.length > 0) {
+                         const conditions = tokens.flatMap((t: string) => [
+                           likeNormalized(products.name, `%${t}%`),
+                           likeNormalized(products.description, `%${t}%`),
+                           likeNormalized(products.category, `%${t}%`)
+                         ]);
+                         const searchResults = await db.select()
+                           .from(products)
+                           .where(or(...conditions))
+                           .limit(10);
+                        productsData = searchResults.map(p => ({
+                          id: p.id,
+                          name: p.name,
+                          description: p.description,
+                          price: p.price,
+                          stock: p.stock,
+                          imageUrl: p.imageUrl,
+                          category: p.category
+                        }));
+                      }
 
-                     runMessages.push({
-                       role: "tool",
-                       content: JSON.stringify({
-                         products: productsData
-                       })
-                     });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          products: productsData
+                        })
+                      });
                    } else if (tc.function.name === "add_to_cart") {
                      const args = parseArgs(tc.function.arguments);
                      const productId = args.productId;
@@ -614,10 +675,11 @@ export async function POST(req: NextRequest) {
                      const args = parseArgs(tc.function.arguments);
                      const keyword = args.keyword || "";
                      const cleanKeyword = keyword.replace(/['"._]/g, '').trim();
-                     let faqsData = await db.select().from(faqs).where(ilike(faqs.question, `%${cleanKeyword}%`)).limit(3);
-                     if (faqsData.length === 0) {
-                       faqsData = await db.select().from(faqs).where(ilike(faqs.category, `%${cleanKeyword}%`)).limit(3);
-                     }
+                      const cleanKeywordNorm = cleanKeyword.replace(/ı/g,'i').replace(/İ/g,'i').replace(/ü/g,'u').replace(/Ü/g,'u').replace(/ö/g,'o').replace(/Ö/g,'o').replace(/ç/g,'c').replace(/Ç/g,'c').replace(/ş/g,'s').replace(/Ş/g,'s').replace(/ğ/g,'g').replace(/Ğ/g,'g');
+                      let faqsData = await db.select().from(faqs).where(likeNormalized(faqs.question, `%${cleanKeywordNorm}%`)).limit(3);
+                      if (faqsData.length === 0) {
+                        faqsData = await db.select().from(faqs).where(likeNormalized(faqs.category, `%${cleanKeywordNorm}%`)).limit(3);
+                      }
                      runMessages.push({
                        role: "tool",
                        content: JSON.stringify({
@@ -692,7 +754,7 @@ export async function POST(req: NextRequest) {
                    } else if (tc.function.name === "recommend_similar_products") {
                      const args = parseArgs(tc.function.arguments);
                      const category = args.category || "general";
-                     const recommendations = await db.select().from(products).where(ilike(products.category, `%${category}%`)).limit(3);
+                      const recommendations = await db.select().from(products).where(likeNormalized(products.category, `%${category}%`)).limit(3);
                      runMessages.push({
                        role: "tool",
                        content: JSON.stringify({ recommendations: recommendations })
@@ -876,7 +938,7 @@ export async function POST(req: NextRequest) {
                      // Check cart first
                      const cartItemsCount = await db.select().from(cartItems).where(eq(cartItems.cartId, convId));
                      if (cartItemsCount.length > 0) {
-                        const recs = await db.select().from(products).where(ilike(products.category, '%aksesuar%')).limit(2);
+                         const recs = await db.select().from(products).where(likeNormalized(products.category, '%aksesuar%')).limit(2);
                         runMessages.push({
                           role: "tool",
                           content: JSON.stringify({ success: true, recommendations: recs, message: "Sepetinde ürün var. Bu aksesuarları çapraz satış (cross-sell) olarak öner." })

@@ -1,8 +1,37 @@
-import { db } from "./index";
-import { products, coupons, faqs } from "./schema";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+
+// .env dosyasını manuel yükle (tsx ile çalıştırıldığında Next.js .env yüklemez)
+// NOT: Bu işlem, aşağıdaki dinamik import'tan ÖNCE çalışmalıdır
+try {
+  const envPath = resolve(process.cwd(), ".env");
+  const envContent = readFileSync(envPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx > 0) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        let value = trimmed.slice(eqIdx + 1).trim();
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        if (!process.env[key]) process.env[key] = value;
+      }
+    }
+  }
+} catch {}
 
 async function seed() {
+  // Dinamik import - .env yüklendikten SONRA çalışır (import hoisting sorununu bypass eder)
+  const { db } = await import("./index");
+  const { products, coupons, faqs } = await import("./schema");
   console.log("Starting seed...");
+
+  // Tabloları temizle (idempotent seed)
+  await db.delete(products);
+  await db.delete(coupons);
+  await db.delete(faqs);
 
   const demoProducts = [
     {
