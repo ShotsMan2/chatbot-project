@@ -3,7 +3,7 @@
 import { Message } from "./chat-container";
 import ReactMarkdown from "react-markdown";
 import { CodeBlock } from "./code-block";
-import { ProductCard, ProductCarousel, CartCard, CouponCard, OrderTimelineCard, ReviewCard, SupportTicketCard, NegotiationCard, RegistryCard, ArCard } from "./ui-cards";
+import { ProductCard, ProductCarousel, CartCard, CouponCard, OrderTimelineCard, ReviewCard, SupportTicketCard, NegotiationCard, RegistryCard, ArCard, GenProductCard, VipDropCard, VaultCard, CertificateCard } from "./ui-cards";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Copy, RefreshCw, AlertCircle, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -113,6 +113,22 @@ export function MessageItem({ message }: MessageItemProps) {
                         if (match[1] === "json-ar") {
                           const data = JSON.parse(String(children));
                           return <ArCard data={data} />;
+                        }
+                        if (match[1] === "json-genproduct") {
+                          const data = JSON.parse(String(children));
+                          return <GenProductCard data={data} />;
+                        }
+                        if (match[1] === "json-vipdrop") {
+                          const data = JSON.parse(String(children));
+                          return <VipDropCard data={data} />;
+                        }
+                        if (match[1] === "json-vault") {
+                          const data = JSON.parse(String(children));
+                          return <VaultCard data={data} />;
+                        }
+                        if (match[1] === "json-certificate") {
+                          const data = JSON.parse(String(children));
+                          return <CertificateCard data={data} />;
                         }
                       } catch (e) {
                         // ignore parse error, fallback to code block

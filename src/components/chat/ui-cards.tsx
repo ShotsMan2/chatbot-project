@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ShoppingBag, ShoppingCart, Tag, Package, CheckCircle2, Truck, CreditCard, Plus, Star, Headphones } from "lucide-react";
+import { ShoppingBag, ShoppingCart, Tag, Package, CheckCircle2, Truck, CreditCard, Plus, Star, Headphones, AlertCircle } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { addToCartAction } from "@/lib/actions/cart";
@@ -291,6 +291,125 @@ export function ArCard({ data }: { data: any }) {
           {data.buttonText || "Hemen Dene 👓"}
         </a>
       )}
+    </div>
+  );
+}
+
+export function GenProductCard({ data }: { data: any }) {
+  return (
+    <div className="relative p-5 my-3 border border-indigo-500/30 rounded-2xl bg-gradient-to-r from-indigo-50 to-indigo-100/50 dark:from-indigo-950/40 dark:to-indigo-900/10 backdrop-blur-xl shadow-lg max-w-sm text-center overflow-hidden">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none mix-blend-overlay"></div>
+      <div className="mx-auto w-fit p-3 bg-indigo-500/20 rounded-full text-indigo-600 dark:text-indigo-400 mb-3 relative z-10 shadow-[0_0_15px_rgba(99,102,241,0.5)]">
+        <Package className="h-6 w-6 animate-pulse" />
+      </div>
+      <h3 className="font-black text-indigo-900 dark:text-indigo-100 text-lg relative z-10">{data.productType} (AI Üretimi)</h3>
+      <p className="text-xs text-indigo-700/70 dark:text-indigo-300/70 mb-3 italic relative z-10">"{data.designPrompt}"</p>
+      
+      <div className="w-full h-32 bg-indigo-900/10 rounded-xl mb-3 flex items-center justify-center border border-indigo-500/20 relative z-10 overflow-hidden">
+         <div className="text-xs font-mono text-indigo-500 flex flex-col items-center">
+            <span className="mb-1">3D Model Üretiliyor...</span>
+            <span>(Tahmini süre: 2dk)</span>
+         </div>
+      </div>
+      
+      <div className="flex justify-between items-center bg-background/50 p-2 rounded-lg relative z-10">
+        <span className="text-xs font-bold text-muted-foreground">Tahmini: {data.price || "Fiyat Bekleniyor"}</span>
+        <button className="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md hover:bg-indigo-600 transition-colors">
+          Üretime Onay Ver
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function VipDropCard({ data }: { data: any }) {
+  return (
+    <div className="relative p-6 my-3 border border-amber-500/50 rounded-2xl bg-gradient-to-br from-black to-zinc-900 shadow-[0_0_20px_rgba(245,158,11,0.2)] max-w-sm text-center overflow-hidden">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 pointer-events-none mix-blend-overlay"></div>
+      
+      <div className="mx-auto w-fit p-3 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-500 mb-3 relative z-10">
+        <Star className="h-8 w-8 animate-pulse drop-shadow-[0_0_10px_rgba(245,158,11,0.8)]" />
+      </div>
+      
+      <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-500 text-xl relative z-10 mb-1 uppercase tracking-widest">
+        VIP Exclusive
+      </h3>
+      
+      <h4 className="font-bold text-zinc-100 text-lg relative z-10 mb-2">{data.dropName}</h4>
+      
+      <div className="bg-amber-950/40 border border-amber-500/20 rounded-lg p-3 mb-4 relative z-10">
+        <p className="text-sm text-amber-200/80 font-medium">Bu koleksiyon sadece {data.requiredPoints} puan ve üzeri sadık müşterilere açılmıştır.</p>
+        <div className="mt-2 text-xs font-mono text-red-400 font-bold flex items-center justify-center gap-1">
+          <AlertCircle className="h-3 w-3" /> Stokta Sadece {data.remainingStock} Adet Kaldı!
+        </div>
+      </div>
+      
+      <button className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 text-black px-4 py-3 rounded-xl text-sm font-black shadow-[0_0_15px_rgba(245,158,11,0.4)] hover:scale-105 transition-transform relative z-10 uppercase tracking-wider">
+        Koleksiyonu İncele
+      </button>
+    </div>
+  );
+}
+
+export function VaultCard({ data }: { data: any }) {
+  const products = data.products || [];
+  return (
+    <div className="relative p-6 my-4 border border-zinc-700/50 rounded-2xl bg-gradient-to-br from-black via-zinc-950 to-zinc-900 shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-sm text-center overflow-hidden">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none mix-blend-overlay"></div>
+      
+      <div className="mx-auto w-fit p-4 bg-zinc-900 border border-zinc-700 rounded-full text-zinc-300 mb-4 relative z-10 shadow-inner">
+        <Package className="h-8 w-8" />
+      </div>
+      
+      <h3 className="font-black text-transparent bg-clip-text bg-gradient-to-r from-zinc-300 to-zinc-500 text-2xl relative z-10 mb-2 uppercase tracking-[0.3em]">
+        THE VAULT
+      </h3>
+      
+      <p className="text-sm text-zinc-400 font-medium mb-5 relative z-10">{data.message}</p>
+      
+      <div className="space-y-3 relative z-10">
+        {products.map((p: any, idx: number) => (
+          <div key={idx} className="bg-zinc-900/80 border border-zinc-800 rounded-lg p-3 text-left">
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-bold text-zinc-200 text-sm">{p.name}</span>
+              <span className="text-xs font-mono text-zinc-500">{p.isArchived ? "Archived" : "Exclusive"}</span>
+            </div>
+            <div className="text-xs text-zinc-400">Değerleme: <span className="font-bold text-zinc-300">{p.price}</span></div>
+          </div>
+        ))}
+      </div>
+      
+      <button className="w-full mt-5 bg-zinc-100 text-black px-4 py-3 rounded-xl text-sm font-black shadow-lg hover:bg-white transition-colors relative z-10 uppercase tracking-widest">
+        Erişim Sağla
+      </button>
+    </div>
+  );
+}
+
+export function CertificateCard({ data }: { data: any }) {
+  const cert = data.certificate || {};
+  return (
+    <div className="relative p-5 my-3 border border-indigo-500/30 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 shadow-[0_0_20px_rgba(99,102,241,0.3)] max-w-sm overflow-hidden text-slate-200">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
+      
+      <div className="flex items-center gap-3 border-b border-indigo-500/30 pb-3 mb-3 relative z-10">
+        <CheckCircle2 className="h-6 w-6 text-indigo-400" />
+        <div>
+          <h4 className="font-black text-indigo-300 tracking-wider uppercase text-sm">Orijinallik Sertifikası</h4>
+          <p className="text-xs text-slate-400">Digital Twin & Anti-Counterfeit</p>
+        </div>
+      </div>
+      
+      <div className="relative z-10 space-y-2">
+        <p className="text-sm">{data.message}</p>
+        <div className="bg-black/40 p-3 rounded-lg border border-indigo-500/20 font-mono text-xs break-all text-indigo-200">
+          HASH: {cert.hash}
+        </div>
+        <div className="flex justify-between text-xs text-slate-400 pt-2">
+          <span>Veriliş: {new Date(cert.issueDate).toLocaleDateString('tr-TR')}</span>
+          <span className="text-indigo-400 font-bold flex items-center gap-1"><CheckCircle2 className="h-3 w-3"/> Blockchain Verified</span>
+        </div>
+      </div>
     </div>
   );
 }
