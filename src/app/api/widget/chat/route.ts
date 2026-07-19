@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
 import { conversations, messages, products } from "@/lib/db/schema";
-import { eq, ilike } from "drizzle-orm";
+import { eq, ilike, or, sql } from "drizzle-orm";
 import { getSettings } from "@/lib/actions/chat";
-import { matchesProductKeyword, normalizeProductKeyword } from "@/lib/product-search";
+
+// SQL'de Türkçe karakterleri normalize eden helper
+function likeNormalized(col: any, pattern: string) {
+  return sql`LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${col}, 'ı', 'i'), 'ğ', 'g'), 'ü', 'u'), 'ş', 's'), 'ö', 'o'), 'ç', 'c')) LIKE ${pattern}`;
+}
 
 // CORS headers for external sites
 function corsHeaders(origin: string | null) {
@@ -111,46 +115,56 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
       chatHistory.unshift({ role: "system", content: sysPrompt });
     }
 
-    // --- RAG INTENT DETECTION ---
+    // --- RAG PRODUCT SEARCH (keyword extraction + direct SQL ilike) ---
     try {
-      const ollamaRes = await fetch("http://localhost:11434/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: "Sen bir arama niyet okuma asistanısın. Kullanıcının mesajında herhangi bir e-ticaret ürünü (ayakkabı, çanta, saat, kulaklık, mont, gözlük vb.) veya marka/ürün adı arayıp aramadığını bul. Sadece aradığı tek kelimelik anahtar kelimeyi (Örn: 'mont', 'saat', 'ayakkabı', 'selim') döndür. Ürün aramıyorsa veya kelime bulamazsan sadece 'null' kelimesini döndür." },
-            { role: "user", content: message }
-          ],
-          stream: false
-        })
-      });
-      
-      const intentData = await ollamaRes.json();
-      const intentKeyword = intentData.message?.content?.trim() || "null";
-      const normalizedIntent = normalizeProductKeyword(intentKeyword);
+      const STOP_WORDS = new Set(["acaba","hangi","modelleriniz","modeller","neler","var","mi","mı","ne","bir","senin","sizin","bana","ben","isteyorum","istiyorum","ariyorum","arıyorum","göster","goster","ver","bak","bakiyorum","bakarim","soruyorum","sor","lütfen","lutfen","yardim","yardım","nasıl","nasil","kadar","kac","kaç","fiyat","nerede","bu","su","şu","ve","ile","o","ama","de","da","benim","sen","siz","onlar","biz","ya","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","merhaba","selam","nasılsın","nasilsin","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki"]);
+      const normalizeTurkish = (s: string) =>
+        s.toLowerCase().replace(/[ç]/g,'c').replace(/[ğ]/g,'g').replace(/[ı]/g,'i')
+         .replace(/[ö]/g,'o').replace(/[ş]/g,'s').replace(/[ü]/g,'u')
+         .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
 
-      if (intentKeyword && intentKeyword !== "null" && normalizedIntent.length > 2) {
-        const searchResults = await db.select().from(products).limit(50);
-        const matchedProducts = searchResults.filter((product) => matchesProductKeyword(normalizedIntent, product.name));
+      const rawTokens = normalizeTurkish(message).split(' ').filter((t: string) => t.length > 1 && !STOP_WORDS.has(t));
+
+      if (rawTokens.length > 0) {
+        const conditions = rawTokens.flatMap((t: string) => [
+          likeNormalized(products.name, `%${t}%`),
+          likeNormalized(products.description, `%${t}%`),
+          likeNormalized(products.category, `%${t}%`)
+        ]);
+        const matchedProducts = await db.select()
+          .from(products)
+          .where(or(...conditions))
+          .limit(10);
 
         if (matchedProducts.length > 0) {
-          let ragContext = "\n\nSİSTEM BİLGİSİ (Ürünler Bulundu): Kullanıcıya kibarca ürünleri bulduğunuzu söyleyin ve hemen ardından AŞAĞIDAKİ SATIRLARI HİÇBİR DEĞİŞİKLİK YAPMADAN, BİREBİR KOPYALAYIP CEVABINIZA EKLAYİN (Çok Önemli):\n\n";
-          matchedProducts.slice(0, 5).forEach((p) => {
-            const categoryInfo = p.category || "Genel";
-            const stockInfo = p.stock > 0 ? `${p.stock} adet stokta` : "Stokta yok";
-            ragContext += `[${p.name}](#product:${p.id}:${p.price})\n(Sistem İçi Bilgi - Kullanıcıya söyleyebilirsin: Kategori: ${categoryInfo}, Stok: ${stockInfo})\n\n`;
-          });
-          chatHistory.push({ role: "system", content: ragContext });
-        } else {
-          chatHistory.push({
+          const productLines = matchedProducts.slice(0, 5).map((p: any) =>
+            `[${p.name}](#product:${p.id}:${p.price})\n(Bilgi: Kategori: ${p.category || "Genel"}, Stok: ${p.stock > 0 ? p.stock + " adet stokta" : "Stokta yok"})`
+          ).join("\n\n");
+          const prodList = matchedProducts.slice(0, 5).map((p: any) => {
+            let desc = p.description ? ` - ${p.description.substring(0, 80).replace(/[\n\r]/g, ' ')}` : "";
+            return `- ${p.name} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})${desc}`;
+          }).join("\n");
+          // System prompt'u tamamen değiştir
+          chatHistory[0] = {
             role: "system",
-            content: "Ürün veritabanında eşleşme bulunamadı. Kullanıcıya ürün bilgisi olmadığını açıkça söyle ve destek talebi oluşturulabileceğini belirt."
-          });
+            content: `Sen bir e-ticaret yardımcısısın. Kullanıcıya aşağıdaki ürün bilgilerini kullanarak doğrudan yanıt ver.
+
+Kurallar:
+1. Kullanıcının sorusu, listedeki ürünlerden biriyle ilgiliyse (isim tam eşleşmese bile, örn: kullanıcı "laptop çantası" derse listede "Laptop Sırt Çantası" varsa bu aynı üründür), o ürünün bilgisini ver.
+2. Ürün bulunduysa "bilmiyorum" veya "ulaşamıyorum" KESİNLİKLE deme.
+3. Veride olmayan bilgiyi (renk, beden, materyal vb) uydurma, sadece verileni söyle.
+4. Cevabında ürün linkini aynen kullan: ${matchedProducts.slice(0, 5).map((p: any) => `[${p.name}](#product:${p.id}:${p.price})`).join(" ")}
+5. Kısa, net ve kibar ol.
+
+Mevcut ürünler:
+${prodList}
+
+İletişim: 0850 123 45 67, destek@demoshop.com`
+          };
         }
       }
     } catch (e) {
-      console.error("Intent RAG Error:", e);
+      console.error("RAG Search Error:", e);
     }
     // ----------------------------
 
