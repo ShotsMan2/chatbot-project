@@ -243,3 +243,212 @@ export const dynamicPricingRules = pgTable("dynamic_pricing_rules", {
   currentDemandMultiplier: text("current_demand_multiplier").notNull().default("1.0"),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const spatialSessions = pgTable("spatial_sessions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"),
+  environment: text("environment", { enum: ["luxury_boutique", "cyber_mall", "beach_store"] }).notNull().default("luxury_boutique"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const agenticTasks = pgTable("agentic_tasks", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id"),
+  agentType: text("agent_type", { enum: ["devin", "copilot", "pi", "cursor", "opencode"] }).notNull(),
+  taskDescription: text("task_description").notNull(),
+  status: text("status", { enum: ["pending", "in_progress", "completed", "failed"] }).notNull().default("pending"),
+  resultPayload: text("result_payload"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const groupBuys = pgTable("group_buys", {
+  id: text("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  initiatorUserId: text("initiator_user_id").notNull(),
+  requiredParticipants: integer("required_participants").notNull().default(5),
+  currentParticipants: integer("current_participants").notNull().default(1),
+  discountPercent: integer("discount_percent").notNull().default(20),
+  status: text("status", { enum: ["active", "completed", "expired"] }).notNull().default("active"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const groupBuyParticipants = pgTable("group_buy_participants", {
+  id: serial("id").primaryKey(),
+  groupBuyId: text("group_buy_id").notNull().references(() => groupBuys.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(),
+  joinedAt: timestamp("joined_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const userQuests = pgTable("user_quests", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  questType: text("quest_type", { enum: ["daily_login", "review_product", "invite_friend", "find_easter_egg"] }).notNull(),
+  status: text("status", { enum: ["active", "completed", "claimed"] }).notNull().default("active"),
+  rewardPoints: integer("reward_points").notNull().default(50),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const userWardrobes = pgTable("user_wardrobes", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  purchaseDate: timestamp("purchase_date").notNull().default(sql`CURRENT_TIMESTAMP`),
+  wearFrequency: integer("wear_frequency").notNull().default(0),
+});
+
+export const exclusiveDrops = pgTable("exclusive_drops", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  dropName: text("drop_name").notNull(),
+  requiredLoyaltyPoints: integer("required_loyalty_points").notNull().default(500),
+  isUnlocked: integer("is_unlocked").notNull().default(0),
+  availableUntil: timestamp("available_until"),
+});
+
+export const customManufacturingRequests = pgTable("custom_manufacturing_requests", {
+  id: text("id").primaryKey(),
+  userId: text("user_id"),
+  productType: text("product_type").notNull(),
+  prompt: text("prompt").notNull(),
+  status: text("status", { enum: ["designing", "manufacturing", "shipped", "delivered"] }).notNull().default("designing"),
+  price: text("price"),
+  estimatedDelivery: timestamp("estimated_delivery"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const aiGeneratedDesigns = pgTable("ai_generated_designs", {
+  id: serial("id").primaryKey(),
+  requestId: text("request_id").notNull().references(() => customManufacturingRequests.id, { onDelete: "cascade" }),
+  imageUrl: text("image_url").notNull(),
+  designData: text("design_data"),
+  isApproved: integer("is_approved").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const hyperlocalNodes = pgTable("hyperlocal_nodes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  latitude: real("latitude").notNull(),
+  longitude: real("longitude").notNull(),
+  droneFleetSize: integer("drone_fleet_size").notNull().default(0),
+  isActive: integer("is_active").notNull().default(1),
+});
+
+export const neuralCommerceSessions = pgTable("neural_commerce_sessions", {
+  id: serial("id").primaryKey(),
+  chatId: text("chat_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  typingSpeedWpm: integer("typing_speed_wpm"),
+  hesitationCount: integer("hesitation_count").notNull().default(0),
+  detectedEmotion: text("detected_emotion", { enum: ["eager", "hesitant", "frustrated", "bored", "urgent"] }),
+  appliedStrategy: text("applied_strategy"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const brandEvents = pgTable("brand_events", {
+  id: serial("id").primaryKey(),
+  eventName: text("event_name").notNull(),
+  eventDate: timestamp("event_date").notNull(),
+  location: text("location").notNull(),
+  requiredLoyaltyPoints: integer("required_loyalty_points").notNull().default(1000),
+  isVirtual: integer("is_virtual").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const bespokeMeasurements = pgTable("bespoke_measurements", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  shoulderWidth: real("shoulder_width"),
+  chest: real("chest"),
+  waist: real("waist"),
+  inseam: real("inseam"),
+  fitPreference: text("fit_preference", { enum: ["slim", "regular", "oversize", "tailored"] }).notNull().default("tailored"),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const tryAtHomeRequests = pgTable("try_at_home_requests", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  status: text("status", { enum: ["pending", "shipped", "delivered", "returned", "completed"] }).notNull().default("pending"),
+  curatedBoxDescription: text("curated_box_description"),
+  trackingCode: text("tracking_code"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const vipConciergeSessions = pgTable("vip_concierge_sessions", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  agentType: text("agent_type", { enum: ["human_stylist", "devin_luxury", "copilot_bespoke"] }).notNull(),
+  sessionNotes: text("session_notes"),
+  status: text("status", { enum: ["active", "concluded"] }).notNull().default("active"),
+  startedAt: timestamp("started_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const brandAmbassadorApplications = pgTable("brand_ambassador_applications", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  socialMediaHandle: text("social_media_handle").notNull(),
+  portfolioUrl: text("portfolio_url"),
+  status: text("status", { enum: ["under_review", "approved", "rejected"] }).notNull().default("under_review"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const brandHeritageArchives = pgTable("brand_heritage_archives", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  era: text("era").notNull(),
+  storyContent: text("story_content").notNull(),
+  artifactImageUrl: text("artifact_image_url"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const clientStyleDna = pgTable("client_style_dna", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  colorPalette: text("color_palette").default("neutral"),
+  preferredMaterials: text("preferred_materials"),
+  lifestyleProfile: text("lifestyle_profile"),
+  climateZone: text("climate_zone"),
+  skinTone: text("skin_tone"),
+  lastUpdated: timestamp("last_updated").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const theVaultProducts = pgTable("the_vault_products", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  requiredLoyaltyPoints: integer("required_loyalty_points").notNull().default(5000),
+  isArchived: integer("is_archived").notNull().default(0),
+  unlockPasscode: text("unlock_passcode"),
+});
+
+export const digitalCertificates = pgTable("digital_certificates", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  orderId: text("order_id").notNull().references(() => orders.id),
+  issueDate: timestamp("issue_date").notNull().default(sql`CURRENT_TIMESTAMP`),
+  authenticityHash: text("authenticity_hash").notNull().unique(),
+  isTransferred: integer("is_transferred").notNull().default(0),
+});
+
+export const whiteGloveServices = pgTable("white_glove_services", {
+  id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  serviceType: text("service_type", { enum: ["airport_delivery", "home_tailoring", "private_courier", "style_consultation"] }).notNull(),
+  scheduledDate: timestamp("scheduled_date").notNull(),
+  locationDetails: text("location_details").notNull(),
+  status: text("status", { enum: ["requested", "confirmed", "in_progress", "completed"] }).notNull().default("requested"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const oneOfOneRequests = pgTable("one_of_one_requests", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  designBrief: text("design_brief").notNull(),
+  inspirationUrls: text("inspiration_urls"),
+  status: text("status", { enum: ["brief_submitted", "design_phase", "client_review", "manufacturing", "delivered"] }).notNull().default("brief_submitted"),
+  estimatedPrice: text("estimated_price"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

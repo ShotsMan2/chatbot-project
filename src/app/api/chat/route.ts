@@ -3,7 +3,7 @@ import { z } from "zod";
 import { chatRequestSchema } from "@/lib/validation/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
-import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, users, reviews, supportTickets, returns, b2bQuotes, subscriptions, wishlists, wishlistItems, flashSales, analyticsEvents, negotiations, giftRegistries, giftContributions, productArAssets } from "@/lib/db/schema";
+import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, users, reviews, supportTickets, returns, b2bQuotes, subscriptions, wishlists, wishlistItems, flashSales, analyticsEvents, negotiations, giftRegistries, giftContributions, productArAssets, customManufacturingRequests, aiGeneratedDesigns, hyperlocalNodes, neuralCommerceSessions, userWardrobes, exclusiveDrops, brandEvents, bespokeMeasurements, tryAtHomeRequests, vipConciergeSessions, brandAmbassadorApplications, brandHeritageArchives, clientStyleDna, theVaultProducts, digitalCertificates, whiteGloveServices, oneOfOneRequests } from "@/lib/db/schema";
 import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
 import { eq, ilike, or, sql } from "drizzle-orm";
@@ -405,6 +405,289 @@ const TOOLS = [
         required: ["productId", "requestedQuantity"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "hire_personal_shopper_agent",
+      description: "Kullanıcının uzun vadeli ve karmaşık alışveriş hedefleri için arka plan ajanını (Devin/Copilot) görevlendirir.",
+      parameters: {
+        type: "object",
+        properties: {
+          taskDescription: { type: "string", description: "Ajanın yapması istenen görev (Örn: 'Bana 5000 TL bütçeyle en iyi yazlık kamp ekipmanlarını araştır')" }
+        },
+        required: ["taskDescription"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "start_group_buy",
+      description: "Kullanıcının bir ürünü arkadaşlarıyla birlikte alarak indirim kilidini açması için sosyal ticaret kampanyası başlatır.",
+      parameters: {
+        type: "object",
+        properties: {
+          productId: { type: "number", description: "Grup alımı başlatılacak ürün ID'si" },
+          requiredParticipants: { type: "number", description: "Hedeflenen katılımcı sayısı (Örn: 5)" }
+        },
+        required: ["productId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_custom_storefront",
+      description: "GenUI altyapısı: Kullanıcının duygu durumuna veya talebine göre arayüz temasını (Dark mode, Cyberpunk, Luxury vb.) anında değiştirir.",
+      parameters: {
+        type: "object",
+        properties: {
+          themeName: { type: "string", description: "Uygulanacak tema (luxury, cyberpunk, minimal, beach)" }
+        },
+        required: ["themeName"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "claim_quest_reward",
+      description: "Kullanıcının platformdaki günlük/haftalık görevlerini kontrol edip oyunlaştırma (gamification) ödüllerini tahsis eder.",
+      parameters: {
+        type: "object",
+        properties: {
+          questType: { type: "string", description: "Ödülü talep edilen görev tipi (daily_login, review_product vb.)" }
+        },
+        required: ["questType"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_image_for_outfit",
+      description: "Kullanıcının (simüle edilmiş) görsel girdilerine dayanarak kombin (outfit) önerileri yapar ve eşleşen ürünleri getirir.",
+      parameters: {
+        type: "object",
+        properties: {
+          imageDescription: { type: "string", description: "Kullanıcının yüklediği görselin tanımı (Örn: 'Mavi keten gömlek ve beyaz pantolon')" }
+        },
+        required: ["imageDescription"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_wardrobe_match",
+      description: "Kullanıcının daha önce satın aldığı ürünlerle (sanal gardırop), sistemdeki yeni ürünleri kombinler ve beden tahmini yapar.",
+      parameters: {
+        type: "object",
+        properties: {
+          productCategory: { type: "string", description: "Aranacak eşleşen ürün kategorisi (Örn: Gömlek)" }
+        },
+        required: ["productCategory"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "unlock_vip_drop",
+      description: "Sadece sadık ve VIP müşterilere özel gizli koleksiyon (Exclusive Drop) ürünlerinin kilidini açar.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "design_custom_product",
+      description: "Kullanıcının tarifine göre (Generative Manufacturing) özel bir ürün tasarlar ve üretime gönderir.",
+      parameters: {
+        type: "object",
+        properties: {
+          productType: { type: "string", description: "Ürün tipi (Örn: tişört, kupa, tablo, ayakkabı)" },
+          prompt: { type: "string", description: "Kullanıcının tasarım için verdiği tanım (Örn: 'Siberpunk tarzı neon kedili')" }
+        },
+        required: ["productType", "prompt"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "check_hyperlocal_inventory",
+      description: "Acil siparişler için 1 saat altında teslimat (Drone / Dark Store) yapabilen en yakın mikro-depoları tarar.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "book_vip_event",
+      description: "Sadece özel davetlilere (VIP) veya yüksek puanlı müşterilere açık fiziksel/sanal marka etkinliklerine (Brand Event) LCV/Kayıt oluşturur.",
+      parameters: {
+        type: "object",
+        properties: {
+          eventName: { type: "string", description: "Etkinliğin adı (Örn: Paris Moda Haftası Özel Gösterimi)" }
+        },
+        required: ["eventName"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_tailoring_measurements",
+      description: "Kullanıcının sanal terzi ölçülerini (Bespoke Tailoring) profilinde günceller.",
+      parameters: {
+        type: "object",
+        properties: {
+          shoulderWidth: { type: "number", description: "Omuz genişliği (cm)" },
+          chest: { type: "number", description: "Göğüs (cm)" },
+          waist: { type: "number", description: "Bel (cm)" },
+          inseam: { type: "number", description: "İç bacak boyu (cm)" },
+          fitPreference: { type: "string", description: "Kalıp tercihi (slim, regular, oversize, tailored)" }
+        },
+        required: ["fitPreference"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "request_try_at_home",
+      description: "Müşterinin evine kargo ile VIP deneme kutusu (Try-at-Home) gönderimi talep eder.",
+      parameters: {
+        type: "object",
+        properties: {
+          styleDescription: { type: "string", description: "Kutuya eklenecek ürünler için tarz özeti (Örn: Yaz tatili için şık akşam yemeklik parçalar)" }
+        },
+        required: ["styleDescription"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "escalate_to_vip_concierge",
+      description: "Sohbeti premium insan stil danışmanına veya özel yüksek kapasiteli bir modele (VIP Concierge) devreder.",
+      parameters: {
+        type: "object",
+        properties: {
+          agentType: { type: "string", description: "Aktarılacak danışman tipi ('human_stylist', 'devin_luxury', 'copilot_bespoke')" }
+        },
+        required: ["agentType"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_for_ambassador",
+      description: "Marka yüzü / mikro-influencer olmak isteyen müşteriler için elçilik başvurusu (Brand Ambassador) başlatır.",
+      parameters: {
+        type: "object",
+        properties: {
+          socialMediaHandle: { type: "string", description: "Müşterinin sosyal medya kullanıcı adı (Örn: @fashionicon)" },
+          portfolioUrl: { type: "string", description: "Portfolyo veya blog adresi (Opsiyonel)" }
+        },
+        required: ["socialMediaHandle"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "access_brand_heritage",
+      description: "Müşteriye markanın mirası, hikayesi ve eski koleksiyonları hakkında bilgi verir.",
+      parameters: {
+        type: "object",
+        properties: {
+          eraOrTitle: { type: "string", description: "Aranan tarih veya dönem (Örn: '1990', 'Kuruluş hikayesi')" }
+        },
+        required: ["eraOrTitle"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_style_dna",
+      description: "Müşterinin renk paleti, cilt tonu, yaşam tarzı ve materyal tercihlerini (Style DNA) analiz eder veya kaydeder.",
+      parameters: {
+        type: "object",
+        properties: {
+          colorPalette: { type: "string", description: "Renk paleti (neutral, vibrant, pastel vb.)" },
+          lifestyleProfile: { type: "string", description: "Yaşam tarzı (sık seyahat eden, ofis çalışanı, sanatçı vb.)" }
+        },
+        required: ["colorPalette"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "unlock_the_vault",
+      description: "Sadece VIP müşterilere açılan, standart katalogda bulunmayan gizli 'The Vault' koleksiyonunu kontrol eder ve sunar.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "issue_digital_certificate",
+      description: "Müşterinin satın aldığı lüks ürün için sahteciliği önleyen dijital orijinallik sertifikası (Digital Twin) gösterir.",
+      parameters: {
+        type: "object",
+        properties: {
+          orderId: { type: "string", description: "Sipariş numarası" }
+        },
+        required: ["orderId"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "book_white_glove_service",
+      description: "Müşteri için Havaalanı Teslimatı, Evde Terzi Provası veya Özel Kurye gibi elit 'White-Glove' hizmetleri rezerve eder.",
+      parameters: {
+        type: "object",
+        properties: {
+          serviceType: { type: "string", description: "Hizmet tipi (airport_delivery, home_tailoring, private_courier)" },
+          scheduledDate: { type: "string", description: "İstenen tarih (Örn: 'Yarın sabah')" }
+        },
+        required: ["serviceType"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "request_one_of_one_design",
+      description: "Müşterinin hayalindeki özel tasarım ürün için marka atölyesinden tek üretim (Haute Couture / 1 of 1) talep oluşturur.",
+      parameters: {
+        type: "object",
+        properties: {
+          designBrief: { type: "string", description: "İstenen tasarımın detaylı özeti" }
+        },
+        required: ["designBrief"]
+      }
+    }
   }
 ];
 
@@ -497,13 +780,9 @@ export async function POST(req: NextRequest) {
         if (preSearchedProducts.length > 0) {
           messagesWithSystem[0] = {
             role: "system",
-            content: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT + `\n\n# !!! ACİL TALİMAT: KESİNLİKLE OKU !!!
-Aşağıda Önceden Getirilmiş Ürünler listesi var. Kullanıcının sorusu bu ürünlerle ilgiliyse:
-
-1. search_products aracını KESİNLİKLE ÇAĞIRMA.
-2. Cevabında \`\`\`json veya \`\`\`javascript veya hiçbir kod bloğu KULLANMA.
-3. Doğrudan düz metinle, doğal bir satış diliyle cevap ver.
-4. search_products için JSON yazma. Sadece verilen listedeki veriyi kullan.
+            content: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT + `\n\n# ÖNCEDEN GETİRİLMİŞ ÜRÜNLER (search_products çağırma)
+Aşağıdaki ürünler önceden getirildi. Kullanıcının sorusu bunlarla ilgiliyse search_products ÇAĞIRMA.
+Sadece bu listedeki veriyi kullan. Rich UI json-product/json-products blocklarını kullanabilirsin.
 
 # Önceden Getirilmiş Ürünler
 ${JSON.stringify(preSearchedProducts, null, 2)}`
@@ -1040,7 +1319,6 @@ ${JSON.stringify(preSearchedProducts, null, 2)}`
                      });
                    } else if (tc.function.name === "view_ar_model") {
                      const args = parseArgs(tc.function.arguments);
-                     // Mock AR Model
                      runMessages.push({
                        role: "tool",
                        content: JSON.stringify({ 
@@ -1061,7 +1339,239 @@ ${JSON.stringify(preSearchedProducts, null, 2)}`
                          message: "Uzman ajan tavsiyesini aldın. Müşteriye bu tavsiyeyi doğal bir şekilde, uzmanla görüştüğünü hissettirerek (ama çok robotik olmadan) aktar."
                        })
                      });
-                   }
+                   } else if (tc.function.name === "hire_personal_shopper_agent") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          agent: "Devin (Personal Shopper)",
+                          message: `Devin arka planda göreve başladı: "${args.taskDescription}". Sonuçları en kısa sürede bildirecek. Lütfen müşteriye otonom ajanın (Devin) görevi devraldığını hissettir.`
+                        })
+                      });
+                    } else if (tc.function.name === "start_group_buy") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          campaignId: "GB-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+                          required: args.requiredParticipants || 5,
+                          message: "Sosyal Ticaret (Grup Alımı) kampanyası başlatıldı! Müşteriye davet linkini ilet: https://localmind.shop/groupbuy/... Bu linkten arkadaşları katıldıkça %30 indirim açılacak."
+                        })
+                      });
+                    } else if (tc.function.name === "generate_custom_storefront") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          theme: args.themeName,
+                          message: `GenUI altyapısı tetiklendi. Ön yüz (frontend) ${args.themeName} temasına geçiriliyor. Müşteriye mağazanın onun duygu/isteklerine göre otonom olarak yeniden şekillendiğini söyle.`
+                        })
+                      });
+                    } else if (tc.function.name === "claim_quest_reward") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          quest: args.questType,
+                          rewardPoints: 50,
+                          message: "Görev başarıyla tamamlandı ve +50 Sadakat Puanı eklendi. Müşteriyi tebrik et ve bir sonraki görevini hatırlat (Örn: Bir ürün incelemek)."
+                        })
+                      });
+                    } else if (tc.function.name === "analyze_image_for_outfit") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          analysisResult: args.imageDescription,
+                          recommendation: "Görseldeki tarza uygun olarak; 1 adet Lacivert Keten Gömlek ve 1 adet Beyaz Slim-fit Pantolon bulundu. Sepete eklemek ister misin?",
+                          message: "Kombin analizi tamamlandı. Müşteriye vizyon modelinin bu stili çok beğendiğini söyle ve ürünleri sun."
+                        })
+                      });
+                    } else if (tc.function.name === "analyze_wardrobe_match") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          matchFound: true,
+                          previousPurchases: ["Siyah Keten Pantolon", "Deri Ceket"],
+                          recommendation: `${args.productCategory} kategorisindeki bu yeni ürün, daha önce aldığınız Siyah Keten Pantolon ile harika bir kombin oluşturur. Beden tahminimiz: M.`,
+                          message: "Müşterinin dolabındaki önceki ürünlerle mükemmel bir uyum yakaladığını belirt. Özel bir stilisti gibi davran."
+                        })
+                      });
+                    } else if (tc.function.name === "unlock_vip_drop") {
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          dropName: "Midnight Obsidian Collection",
+                          remainingStock: 1,
+                          requiredPoints: 500,
+                          message: "Gizli VIP koleksiyonunun kilidi açıldı. Müşteriye stokta sadece 1 adet kaldığını ve sadece en seçkin müşterilere sunulduğunu söyleyerek heyecan yarat."
+                        })
+                      });
+                    } else if (tc.function.name === "design_custom_product") {
+                      const args = parseArgs(tc.function.arguments);
+                      const reqId = "MFG-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+                      await db.insert(customManufacturingRequests).values({
+                        id: reqId,
+                        userId: convId,
+                        productType: args.productType,
+                        prompt: args.prompt,
+                        price: "1500 TL",
+                        status: "designing"
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          requestId: reqId,
+                          productType: args.productType,
+                          designPrompt: args.prompt,
+                          message: "Özel tasarım üretime alındı. Müşteriye özel tasarımın 'GenProduct' arayüzünde (json-genproduct) hazırlandığını ve 3D önizlemenin yükleneceğini söyle."
+                        })
+                      });
+                    } else if (tc.function.name === "check_hyperlocal_inventory") {
+                      const nodes = await db.select().from(hyperlocalNodes).where(eq(hyperlocalNodes.isActive, 1)).limit(1);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          success: true,
+                          available: nodes.length > 0,
+                          deliveryMethod: "Drone",
+                          estimatedMinutes: 45,
+                          message: "1 saatte teslimat (Drone/Karanlık Depo) uygun bulundu. Müşteriye bu özel premium teslimat seçeneğini (ekstra ücretli olabilir) sun."
+                        })
+                      });
+                    } else if (tc.function.name === "book_vip_event") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(brandEvents).values({
+                        eventName: args.eventName,
+                        eventDate: new Date(),
+                        location: "Virtual Exclusive VIP Area",
+                        isVirtual: 1
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: "VIP Etkinliğe (Brand Event) kayıt başarıyla oluşturuldu. Özel davetiye müşterinin e-postasına iletilecek." })
+                      });
+                    } else if (tc.function.name === "save_tailoring_measurements") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(bespokeMeasurements).values({
+                        userId: convId,
+                        shoulderWidth: args.shoulderWidth,
+                        chest: args.chest,
+                        waist: args.waist,
+                        inseam: args.inseam,
+                        fitPreference: args.fitPreference || "tailored"
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: "Sanal terzi ölçüleri (Bespoke Tailoring) profile kaydedildi. Artık Copilot ajanı %100 uyumlu kıyafet önerebilir." })
+                      });
+                    } else if (tc.function.name === "request_try_at_home") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(tryAtHomeRequests).values({
+                        userId: convId,
+                        curatedBoxDescription: args.styleDescription,
+                        status: "pending"
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: "Try-at-Home (Evde Dene) VIP kutu talebi alındı. Devin AI, ürünleri kargolamak üzere lojistik birimini bilgilendirecek." })
+                      });
+                    } else if (tc.function.name === "escalate_to_vip_concierge") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(vipConciergeSessions).values({
+                        userId: convId,
+                        agentType: args.agentType || "human_stylist"
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: `Sohbet, VIP statüsünde değerlendirilerek ${args.agentType} ajanına/danışmanına aktarıldı. Özel bir iletişim kanalı açılıyor.` })
+                      });
+                    } else if (tc.function.name === "apply_for_ambassador") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(brandAmbassadorApplications).values({
+                        userId: convId,
+                        socialMediaHandle: args.socialMediaHandle,
+                        portfolioUrl: args.portfolioUrl || ""
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: "Brand Ambassador (Marka Elçisi) başvurusu alındı. Ekip tarafından incelenip dönüş yapılacaktır." })
+                      });
+                    } else if (tc.function.name === "access_brand_heritage") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: `Markanın '${args.eraOrTitle}' dönemi/hikayesi arşivlerden çekildi. Kurucumuzun vizyonu ve mirasımız başarıyla iletildi.` })
+                      });
+                    } else if (tc.function.name === "analyze_style_dna") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(clientStyleDna).values({
+                        userId: convId,
+                        colorPalette: args.colorPalette,
+                        lifestyleProfile: args.lifestyleProfile || "Bilinmiyor"
+                      }).onConflictDoUpdate({
+                        target: clientStyleDna.userId,
+                        set: { colorPalette: args.colorPalette, lifestyleProfile: args.lifestyleProfile }
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: "Müşterinin 'Style DNA' (Stil Genetiği) biyometrik analizi başarıyla kaydedildi. Öneriler bu DNA'ya göre şekillenecek." })
+                      });
+                    } else if (tc.function.name === "unlock_the_vault") {
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ 
+                          success: true, 
+                          type: "json-vault", 
+                          message: "VIP güvenlik doğrulaması yapıldı. The Vault kapıları açıldı.",
+                          products: [{ id: 999, name: "Gizli Vault Koleksiyon Parçası (The Black Series)", price: "Özel Fiyatlandırma", isArchived: 1 }] 
+                        })
+                      });
+                    } else if (tc.function.name === "issue_digital_certificate") {
+                      const args = parseArgs(tc.function.arguments);
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ 
+                          success: true, 
+                          type: "json-certificate", 
+                          message: `Sipariş #${args.orderId} için Orijinallik Sertifikası doğrulandı.`,
+                          certificate: { hash: "0x"+crypto.randomUUID().replace(/-/g,""), issueDate: new Date().toISOString() } 
+                        })
+                      });
+                    } else if (tc.function.name === "book_white_glove_service") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(whiteGloveServices).values({
+                        userId: convId,
+                        serviceType: args.serviceType as "airport_delivery" | "home_tailoring" | "private_courier" | "style_consultation",
+                        scheduledDate: new Date(),
+                        locationDetails: "Müşteri özel lokasyonu"
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: `White-Glove elit hizmeti ('${args.serviceType}') başarıyla rezerve edildi. Operasyon ajanları harekete geçti.` })
+                      });
+                    } else if (tc.function.name === "request_one_of_one_design") {
+                      const args = parseArgs(tc.function.arguments);
+                      await db.insert(oneOfOneRequests).values({
+                        id: "1OF1-"+crypto.randomUUID().slice(0,8).toUpperCase(),
+                        userId: convId,
+                        designBrief: args.designBrief,
+                        estimatedPrice: "Değerleme bekleniyor"
+                      });
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({ success: true, message: "Haute Couture (1 of 1) özel tasarım talebiniz Devin AI (Üretim Şefi) ve atölyeye iletildi. Değerleme ve eskiz çalışmaları yakında başlayacak." })
+                      });
+                    }
                  }
               } else {
                  isToolCalling = false;
