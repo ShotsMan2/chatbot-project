@@ -1,0 +1,121 @@
+{
+  "products": [
+    {
+      "id": 57,
+      "name": "Spor Ayakkabı - Siyah/Beyaz",
+      "description": "Rahat ve şık tasarım, günlük kullanıma uygun spor ayakkabı. Nefes alabilir kumaş ve dayanıklı taban.",
+      "price": "899",
+      "stock": 50,
+      "imageUrl": "/images/spor-ayakkabi.png",
+      "category": "Ayakkabı"
+    },
+    {
+      "id": 58,
+      "name": "Deri El Çantası - Premium",
+      "description": "100% doğal deri, el işçiliği ile üretilen premium el çantası. İç bölmeli, fermuarlı tasarım.",
+      "price": "1249",
+      "stock": 30,
+      "imageUrl": "/images/deri-canta.png",
+      "category": "Çanta"
+    },
+    {
+      "id": 59,
+      "name": "Akıllı Saat - GPS Destekli",
+      "description": "GPS takibi, kalp atış hızı ölçümü, suya dayanıklı akıllı saat. 5 gün pil ömrü.",
+      "price": "2499",
+      "stock": 20,
+      "imageUrl": "/images/akilli-saat.png",
+      "category": "Elektronik"
+    },
+    {
+      "id": 60,
+      "name": "Kablosuz Kulaklık - ANC",
+      "description": "Aktif gürültü engelleme teknolojisi, 40mm sürücü, 30 saat pil ömrü.Bluetooth 5.3 bağlantısı.",
+      "price": "1599",
+      "stock": 40,
+      "imageUrl": "/images/kulaklik.png",
+      "category": "Elektronik"
+    },
+    {
+      "id": 61,
+      "name": "Telefon Kılıfı - Şeffaf",
+      "description": "Darbe emici TPU malzeme, şeffaf tasarım. iPhone ve Samsung modelleri için uyumlu.",
+      "price": "149",
+      "stock": 100,
+      "imageUrl": "/images/telefon-kilifi.png",
+      "category": "Aksesuar"
+    },
+    {
+      "id": 62,
+      "name": "Kışlık Mont - Su Geçirmez",
+      "description": "20000mm su geçirmezlik, termal dolgulu, rüzgar geçirmez kış montu. Her hava koşuluna uygun.",
+      "price": "1899",
+      "stock": 25,
+      "imageUrl": "/images/kislik-mont.png",
+      "category": "Giyim"
+    },
+    {
+      "id": 63,
+      "name": "Güneş Gözlüğü - UV400",
+      "description": "UV400 koruma, polarize cam, metal çerçeve. Şık ve dayanıklı tasarım.",
+      "price": "449",
+      "stock": 60,
+      "imageUrl": "/images/gunes-gozlugu.png",
+      "category": "Aksesuar"
+    },
+    {
+      "id": 64,
+      "name": "Laptop Sırt Çantası",
+      "description": "15.6 inç laptop bölmeli, su geçirmez kumaş, ergonomik askı sistemi. Seyahat ve iş için ideal.",
+      "price": "699",
+      "stock": 35,
+      "imageUrl": "/images/laptop-canta.png",
+      "category": "Çanta"
+    }
+  ],
+  "faqs": [
+    {
+      "id": 37,
+      "question": "Siparişim ne zaman kargoya verilir?",
+      "answer": "Siparişleriniz ödeme onayından sonra 1-2 iş günü içinde kargoya verilir. Resmi tatillerde bu süre uzayabilir.",
+      "category": "kargo"
+    },
+    {
+      "id": 38,
+      "question": "İade ve değişim politikanız nedir?",
+      "answer": "Satın aldığınız ürünleri 14 gün içinde iade edebilir veya değiştirebilirsiniz. Ürünün kullanılmamış ve orijinal ambalajında olması gerekmektedir.",
+      "category": "iade"
+    },
+    {
+      "id": 39,
+      "question": "Hangi ödeme yöntemlerini kabul ediyorsunuz?",
+      "answer": "Kredi kartı, banka kartı, havale/EFT ve kapıda ödeme seçeneklerini kullanabilirsiniz. Tüm online ödemeler SSL ile güvence altındadır.",
+      "category": "ödeme"
+    },
+    {
+      "id": 40,
+      "question": "Kargo ücreti ne kadar?",
+      "answer": "100 TL ve üzeri siparişlerde kargo ücretsizdir. 100 TL altındaki siparişler için kargo ücreti 14.90 TL'dir.",
+      "category": "kargo"
+    },
+    {
+      "id": 41,
+      "question": "Siparişimi nasıl takip edebilirim?",
+      "answer": "Sipariş takip numaranız e-posta ile gönderilir. Ayrıca hesabınızdan siparişlerim bölümünden durumunu kontrol edebilirsiniz.",
+      "category": "sipariş"
+    },
+    {
+      "id": 42,
+      "question": "Ürünleriniz orijinal mi?",
+      "answer": "Evet, tüm ürünlerimiz orijinal ve üretici garantilidir. Sahte veya taklit ürün satışı yapılmamaktadır.",
+      "category": "genel"
+    }
+  ],
+  "brand_events": [],
+  "carts": [],
+  "orders": [],
+  "users": [],
+  "digital_certificates": [],
+  "the_vault_products": [],
+  "white_glove_services": []
+}
