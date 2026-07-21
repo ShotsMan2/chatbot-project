@@ -137,23 +137,41 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
           .limit(10);
 
         if (matchedProducts.length > 0) {
+          // Kategori bazlı emoji eşleme
+          const categoryEmoji: Record<string, string> = {
+            "Ayakkabı": "👟", "Çanta": "👜", "Elektronik": "📱",
+            "Aksesuar": "🕶️", "Giyim": "🧥", "Genel": "📦"
+          };
+
+          // Frontend'in beklediği 6 parçalı format: #product:ID:Price:OldPrice:Rating:Emoji
+          const buildProductLink = (p: any) => {
+            const emoji = encodeURIComponent(categoryEmoji[p.category] || "📦");
+            const rating = encodeURIComponent("4.8");
+            const priceNum = parseFloat(p.price) || 0;
+            const oldPrice = Math.round(priceNum * 1.25);
+            return `[${p.name}](#product:${p.id}:${p.price}:${oldPrice}:${rating}:${emoji})`;
+          };
+
           const productLines = matchedProducts.slice(0, 5).map((p: any) =>
-            `[${p.name}](#product:${p.id}:${p.price})\n(Bilgi: Kategori: ${p.category || "Genel"}, Stok: ${p.stock > 0 ? p.stock + " adet stokta" : "Stokta yok"})`
+            `${buildProductLink(p)}\n(Kategori: ${p.category || "Genel"}, Stok: ${p.stock > 0 ? p.stock + " adet" : "Stokta yok"})`
           ).join("\n\n");
+
           const prodList = matchedProducts.slice(0, 5).map((p: any) => {
             let desc = p.description ? ` - ${p.description.substring(0, 80).replace(/[\n\r]/g, ' ')}` : "";
             return `- ${p.name} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})${desc}`;
           }).join("\n");
-          // System prompt'u tamamen değiştir
+
+          const allLinks = matchedProducts.slice(0, 5).map((p: any) => buildProductLink(p)).join(" ");
+
           chatHistory[0] = {
             role: "system",
             content: `Sen bir e-ticaret yardımcısısın. Kullanıcıya aşağıdaki ürün bilgilerini kullanarak doğrudan yanıt ver.
 
 Kurallar:
-1. Kullanıcının sorusu, listedeki ürünlerden biriyle ilgiliyse (isim tam eşleşmese bile, örn: kullanıcı "laptop çantası" derse listede "Laptop Sırt Çantası" varsa bu aynı üründür), o ürünün bilgisini ver.
+1. Kullanıcının sorusu, listedeki ürünlerden biriyle ilgiliyse (isim tam eşleşmese bile), o ürünün bilgisini ver.
 2. Ürün bulunduysa "bilmiyorum" veya "ulaşamıyorum" KESİNLİKLE deme.
 3. Veride olmayan bilgiyi (renk, beden, materyal vb) uydurma, sadece verileni söyle.
-4. Cevabında ürün linkini aynen kullan: ${matchedProducts.slice(0, 5).map((p: any) => `[${p.name}](#product:${p.id}:${p.price})`).join(" ")}
+4. Cevabında ürün linklerini aynen kullan: ${allLinks}
 5. Kısa, net ve kibar ol.
 
 Mevcut ürünler:
