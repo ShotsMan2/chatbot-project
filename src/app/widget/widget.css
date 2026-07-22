@@ -555,3 +555,43 @@
 .widget-product-btn:hover {
   opacity: 0.9;
 }
+
+/* ─── Markdown Styles (replaces @tailwindcss/typography) ─── */
+.cemrepark-chat-widget-message-text p {
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+}
+.cemrepark-chat-widget-message-text p:last-child {
+  margin-bottom: 0;
+}
+.cemrepark-chat-widget-message-text strong {
+  font-weight: 600;
+}
+.cemrepark-chat-widget-message-text em {
+  font-style: italic;
+}
+.cemrepark-chat-widget-message-text ul,
+.cemrepark-chat-widget-message-text ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.cemrepark-chat-widget-message-text li {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+.cemrepark-chat-widget-message-text a {
+  color: #e91e8c;
+  text-decoration: underline;
+}
+.cemrepark-chat-widget-message-text code {
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.cemrepark-chat-widget-message-text blockquote {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #6b7280;
+}
