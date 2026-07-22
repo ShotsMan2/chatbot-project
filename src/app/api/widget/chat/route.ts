@@ -100,7 +100,8 @@ KESİN KURALLAR VE KISITLAMALAR (BUNLARI İHLAL ETMEK KESİNLİKLE YASAKTIR):
 - VERİ SINIRLARINDA KAL: Bir ürünün 2 rengi veya bedeni varsa sadece onları söyle. Seçenekleri zenginleştirmek adına listeye fazladan renk veya beden ekleme. Ürün bedeninden bahsederken "boyun" veya "size" kelimelerini kullanma, daima "beden" de.
 - ÜRÜN VERİTABANI SONUÇLARI: Eğer ürün arama sonucu gelirse, bu sonuçlardan yararlan ve sadece bu ürünleri listele. Eğer sonuç yoksa, kullanıcıya açıkça belirt ki ürün veritabanında bulunmuyor.
 - YÖNLENDİRİCİ OL: Müşteriye doğru bilgiyi verdikten sonra, siparişi tamamlaması veya seçim yapması için kısa ve nazik bir soruyla (Örn: "Hangi bedeni tercih edersiniz?") konuşmayı devam ettir.
-- DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN. Cevaplarınızı her zaman Markdown formatında verin.`;
+- DİKKAT: Kullanıcıya cevap verirken 'Merhaba' gibi selamlama cümleleri KULLANMAYIN.
+- DİKKAT: Cevaplarında ASLA ** yıldız işareti kullanma. Düz metin yaz. Ürün linklerini ve listeleri kullanabilirsin ama bold (**text**) formatı kesinlikle kullanma.`;
       if (context) {
         sysPrompt += `\n\nAşağıdaki site ve ürün bilgilerini kullanarak kullanıcının sorularını cevapla:\n${context}`;
       }
@@ -171,8 +172,9 @@ Kurallar:
 1. Kullanıcının sorusu, listedeki ürünlerden biriyle ilgiliyse (isim tam eşleşmese bile), o ürünün bilgisini ver.
 2. Ürün bulunduysa "bilmiyorum" veya "ulaşamıyorum" KESİNLİKLE deme.
 3. Veride olmayan bilgiyi (renk, beden, materyal vb) uydurma, sadece verileni söyle.
-4. Cevabında ürün linklerini aynen kullan: ${allLinks}
-5. Kısa, net ve kibar ol.
+4. Cevabında ürün linklerini AYNEN kullan: ${allLinks}
+5. Ürün linkini yazarken [ÜrünAdı](#product:...) formatında yaz, ] ile ( arasında BOŞLUK bırakma.
+6. Kısa, net ve kibar ol.
 
 Mevcut ürünler:
 ${prodList}
