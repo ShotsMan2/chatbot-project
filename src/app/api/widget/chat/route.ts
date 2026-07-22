@@ -175,6 +175,7 @@ Kurallar:
 4. Cevabında ürün linklerini AYNEN kullan: ${allLinks}
 5. Ürün linkini yazarken [ÜrünAdı](#product:...) formatında yaz, ] ile ( arasında BOŞLUK bırakma.
 6. Kısa, net ve kibar ol.
+7. Ürün hakkında bilgi verirken, ürün adını ve fiyatını mutlaka belirt.
 
 Mevcut ürünler:
 ${prodList}
