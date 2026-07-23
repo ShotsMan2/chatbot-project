@@ -23,13 +23,20 @@ const CATEGORY_EMOJI: Record<string, string> = {
 function normalizeProductLinks(content: string): string {
   let fixed = content;
 
-  // 1) Fix broken markdown links: "] (" or "]\n(" → "]("
+  // 1) Fix malformed LLM outputs where it puts the link inside parenthesis with brackets inside
+  // e.g. [Name (#product:...)] -> [Name](#product:...)
+  fixed = fixed.replace(/\[([^\]]+?)\s*\(\s*(#product:[^)]+)\s*\)\s*\]/g, "[$1]($2)");
+
+  // 2) Fix malformed outputs where there is no opening bracket but #product is in parenthesis
+  // e.g. Name (#product:...) or Name (#product:...)] -> [Ürün](#product:...)
+  fixed = fixed.replace(/(?<!\])\s*\(\s*(#product:[^)]+)\s*\)\]?/g, " [Ürün]($1) ");
+
+  // 3) Fix broken markdown links: "] (" or "]\n(" → "]("
   fixed = fixed.replace(/\]\s*\n\s*\(#product:/g, "](#product:");
   fixed = fixed.replace(/\]\s+\(#product:/g, "](#product:");
 
-  // 2) If LLM wrote plain #product: without markdown link syntax, wrap it
-  //    But skip if it's already inside a markdown link (preceded by ])
-  fixed = fixed.replace(/(?<!\()#product:([^\s\)\n]+)/g, (match, productData) => {
+  // 4) If LLM wrote plain #product: without markdown link syntax, wrap it
+  fixed = fixed.replace(/(?<![\(\:])#product:([^\s\)\n\]]+)/g, (match, productData) => {
     return `[Ürün](#product:${productData})`;
   });
 

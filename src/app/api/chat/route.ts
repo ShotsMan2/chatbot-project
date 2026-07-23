@@ -3,7 +3,7 @@ import { z } from "zod";
 import { chatRequestSchema } from "@/lib/validation/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
-import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, reviews, supportTickets } from "@/lib/db/schema";
+import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, reviews, supportTickets, flashSales } from "@/lib/db/schema";
 import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
 import { eq, ilike, or, sql } from "drizzle-orm";
@@ -90,6 +90,14 @@ const TOOLS = [
     function: {
       name: "checkout_cart",
       description: "Sepeti siparişe dönüştür",
+      parameters: { type: "object", properties: {}, required: [] }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_flash_sales",
+      description: "Flaş indirimli/kampanyalı ürünleri getir",
       parameters: { type: "object", properties: {}, required: [] }
     }
   },
@@ -201,8 +209,8 @@ export async function POST(req: NextRequest) {
          .replace(/ğ/g, 'g').replace(/Ğ/g, 'g')
          .trim().toLowerCase();
       const kw = normalizeTurkish(lastMsg);
-      const stopWords = new Set(["ne","kadar","kac","kaç","fiyat","ne kadar","nerede","nasil","nasıl","kac para","kaç para","var mi","var mı","göster","goster","bul","ara","acaba","lütfen","lutfen","istiyorum","bana","ben","bu","su","şu","ve","ile","bir","o","ama","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","nasılsın","nasilsin","merhaba","selam","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki"]);
-      const tokens = kw.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t));
+      const stopWords = new Set(["ne","kadar","kac","kaç","fiyat","ne kadar","nerede","nasil","nasıl","kac para","kaç para","var mi","var mı","göster","goster","bul","ara","acaba","lütfen","lutfen","istiyorum","bana","ben","bu","su","şu","ve","ile","bir","o","ama","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","nasılsın","nasilsin","merhaba","selam","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki","al","almak","alacagim","isterim","yok","mu","mü","gibi"]);
+      const tokens = kw.split(/\s+/).filter((t: string) => t.length > 2 && !stopWords.has(t));
       if (tokens.length > 0) {
         const conditions = tokens.flatMap((t: string) => [
           likeNormalized(products.name, `%${t}%`),
@@ -212,26 +220,17 @@ export async function POST(req: NextRequest) {
         preSearchedProducts = (await db.select()
           .from(products)
           .where(or(...conditions))
-          .limit(10)
+          .limit(5)
         ).map(p => ({
           id: p.id, name: p.name, description: p.description,
           price: p.price, stock: p.stock, imageUrl: p.imageUrl, category: p.category
         }));
         if (preSearchedProducts.length > 0) {
-          messagesWithSystem[0] = {
-            role: "system",
-            content: `Sen bir e-ticaret asistanısın. Aşağıda verilen ürün bilgilerini kullanarak kullanıcıya yanıt ver.
-
-Kurallar:
-- SADECE aşağıdaki listedeki verileri kullan, hiçbir bilgiyi kendin uydurma
-- Eksik bilgi varsa "Bu bilgi sistemimde bulunmuyor" de
-- Kullanıcı sepete eklemek isterse add_to_cart aracını kullanabilirsin
-- Kibar, net ve premium bir marka asistanı gibi konuş
-- json-product veya json-products formatında kart göster
-
-Ürünler:
-${JSON.stringify(preSearchedProducts, null, 2)}`
-          };
+          const productXml = preSearchedProducts.map(p => 
+            `- İsim: ${p.name}\n  Fiyat: ${p.price}\n  Stok: ${p.stock}\n  Kategori: ${p.category}\n  Açıklama: ${p.description?.substring(0, 150)}...`
+          ).join("\n\n");
+          
+          messagesWithSystem[0].content += `\n\nKULLANICININ ARADIĞI ÜRÜNLER (RAG SONUÇLARI):\nAşağıdaki <product_data> etiketleri arasındaki bilgileri kullanarak cevap ver.\n<product_data>\n${productXml}\n</product_data>`;
         }
       }
 
@@ -250,7 +249,12 @@ ${JSON.stringify(preSearchedProducts, null, 2)}`
               const stream = await ollamaClient.chat({
                 model,
                 messages: runMessages,
-                options: { temperature, num_ctx: contextSize },
+                options: { 
+                  temperature: temperature ?? 0.0, 
+                  top_p: 0.1, 
+                  top_k: 10,
+                  num_ctx: contextSize 
+                },
                 tools: TOOLS,
                 signal: ollamaAbort.signal,
               });
@@ -343,6 +347,26 @@ ${JSON.stringify(preSearchedProducts, null, 2)}`
                         role: "tool",
                         content: JSON.stringify({
                           products: productsData
+                        })
+                      });
+                   } else if (tc.function.name === "get_flash_sales") {
+                      const sales = await db.select({
+                        id: products.id,
+                        name: products.name,
+                        description: products.description,
+                        originalPrice: products.price,
+                        discountPercent: flashSales.discountPercent,
+                        stock: products.stock,
+                        category: products.category
+                      })
+                      .from(flashSales)
+                      .innerJoin(products, eq(flashSales.productId, products.id))
+                      .where(eq(flashSales.isActive, 1));
+                      
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          flash_sales: sales
                         })
                       });
                    } else if (tc.function.name === "add_to_cart") {
