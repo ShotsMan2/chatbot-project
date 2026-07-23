@@ -220,26 +220,17 @@ export async function POST(req: NextRequest) {
         preSearchedProducts = (await db.select()
           .from(products)
           .where(or(...conditions))
-          .limit(10)
+          .limit(5)
         ).map(p => ({
           id: p.id, name: p.name, description: p.description,
           price: p.price, stock: p.stock, imageUrl: p.imageUrl, category: p.category
         }));
         if (preSearchedProducts.length > 0) {
-          messagesWithSystem[0] = {
-            role: "system",
-            content: `Sen bir e-ticaret asistanısın. Aşağıda verilen ürün bilgilerini kullanarak kullanıcıya yanıt ver.
-
-Kurallar:
-- SADECE aşağıdaki listedeki verileri kullan, hiçbir bilgiyi kendin uydurma
-- Eksik bilgi varsa "Bu bilgi sistemimde bulunmuyor" de
-- Kullanıcı sepete eklemek isterse add_to_cart aracını kullanabilirsin
-- Kibar, net ve premium bir marka asistanı gibi konuş
-- json-product veya json-products formatında kart göster
-
-Ürünler:
-${JSON.stringify(preSearchedProducts, null, 2)}`
-          };
+          const productXml = preSearchedProducts.map(p => 
+            `- İsim: ${p.name}\n  Fiyat: ${p.price}\n  Stok: ${p.stock}\n  Kategori: ${p.category}\n  Açıklama: ${p.description?.substring(0, 150)}...`
+          ).join("\n\n");
+          
+          messagesWithSystem[0].content += `\n\nKULLANICININ ARADIĞI ÜRÜNLER (RAG SONUÇLARI):\nAşağıdaki <product_data> etiketleri arasındaki bilgileri kullanarak cevap ver.\n<product_data>\n${productXml}\n</product_data>`;
         }
       }
 
