@@ -3,7 +3,7 @@ import { z } from "zod";
 import { chatRequestSchema } from "@/lib/validation/chat";
 import { ollamaClient } from "@/lib/ollama/ollama-client";
 import { db } from "@/lib/db";
-import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, reviews, supportTickets } from "@/lib/db/schema";
+import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, reviews, supportTickets, flashSales } from "@/lib/db/schema";
 import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
 import { eq, ilike, or, sql } from "drizzle-orm";
@@ -90,6 +90,14 @@ const TOOLS = [
     function: {
       name: "checkout_cart",
       description: "Sepeti siparişe dönüştür",
+      parameters: { type: "object", properties: {}, required: [] }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_flash_sales",
+      description: "Flaş indirimli/kampanyalı ürünleri getir",
       parameters: { type: "object", properties: {}, required: [] }
     }
   },
@@ -343,6 +351,26 @@ ${JSON.stringify(preSearchedProducts, null, 2)}`
                         role: "tool",
                         content: JSON.stringify({
                           products: productsData
+                        })
+                      });
+                   } else if (tc.function.name === "get_flash_sales") {
+                      const sales = await db.select({
+                        id: products.id,
+                        name: products.name,
+                        description: products.description,
+                        originalPrice: products.price,
+                        discountPercent: flashSales.discountPercent,
+                        stock: products.stock,
+                        category: products.category
+                      })
+                      .from(flashSales)
+                      .innerJoin(products, eq(flashSales.productId, products.id))
+                      .where(eq(flashSales.isActive, 1));
+                      
+                      runMessages.push({
+                        role: "tool",
+                        content: JSON.stringify({
+                          flash_sales: sales
                         })
                       });
                    } else if (tc.function.name === "add_to_cart") {
