@@ -97,9 +97,9 @@ Sen, kullanıcılara alışveriş deneyimlerinde yardımcı olan, son derece dik
 KURALLAR:
 - SIFIR HALÜSİNASYON: Sana verilen bağlam metninde/verisinde açıkça yazmayan HİÇBİR bilgiyi (renk, beden, materyal, stok durumu, fiyat, kargo süresi vb.) kendin uyduramazsın veya tahmin edemezsin.
 - BİLMİYORSAN İTİRAF ET: Eğer müşteri, sana verilen verilerde bulunmayan bir özellik sorarsa "Bu bilgiye şu an sistemimden ulaşamıyorum, kontrol edip size dönüş yapmamız için destek talebi oluşturabilirim." şeklinde yanıt ver.
-- VERİ SINIRLARINDA KAL: Sadece üründe olan seçenekleri söyle. "Boyun" gibi kelimeler kullanma, daima "beden" de.
+- VERİ SINIRLARINDA KAL: Sadece üründe olan seçenekleri söyle. Olmayan hiçbir özellik (renk, beden vs.) uydurma veya sorma.
 - ÜRÜN VERİTABANI SONUÇLARI: Eğer ürün arama sonucu gelirse, sadece bu ürünleri listele.
-- YÖNLENDİRİCİ OL: Müşteriye doğru bilgiyi verdikten sonra, siparişi tamamlaması veya seçim yapması için kısa ve nazik bir soruyla (Örn: "Hangi bedeni tercih edersiniz?") konuşmayı devam ettir.
+- DOĞRUDAN LİSTELE: Müşteri ürünleri listelemeni istediğinde başka bir şey (örn. beden, renk vs.) sormadan doğrudan ürünleri listele. Müşteriyi soru yağmuruna tutma.
 - BİÇİMLENDİRME: Cevaplarında kalın metin formatı kullanma. "Merhaba" gibi selamlama cümleleri kullanma.
 - İADE VE DEĞİŞİM: İade/değişim süresinin 14 gün olduğunu ve destek@demoshop.com adresi üzerinden işlem yapılabileceğini açık ve düzgün bir Türkçe ile ifade et.
 - DİL VE ÜSLUP: Yanıtlarını istisnasız olarak tamamen Türkçe dilinde ver.
@@ -127,20 +127,46 @@ KURALLAR:
          .replace(/[ö]/g,'o').replace(/[ş]/g,'s').replace(/[ü]/g,'u')
          .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
 
-      const rawTokens = normalizeTurkish(message).split(' ').filter((t: string) => t.length > 2 && !STOP_WORDS.has(t));
+      const normMsg = normalizeTurkish(message);
+      let orderByPrice: "asc" | "desc" | null = null;
+      if (normMsg.includes("en ucuz") || normMsg.includes("en uygun") || normMsg.includes("dusuk fiyat")) {
+        orderByPrice = "asc";
+      } else if (normMsg.includes("en pahali") || normMsg.includes("en yuksek") || normMsg.includes("yuksek fiyat")) {
+        orderByPrice = "desc";
+      }
 
+      const rawTokens = normMsg.split(' ').filter((t: string) => t.length > 2 && !STOP_WORDS.has(t) && !["ucuz", "pahali", "yuksek", "dusuk", "fiyati", "uygun", "urununuz", "urun", "urunler", "tl", "altindaki", "altinda", "alti", "kadar", "lira", "tum", "butun", "hepsi", "sitenizdeki", "listele"].includes(t) && isNaN(Number(t)));
+
+      let maxPrice: number | null = null;
+      const priceMatch = normMsg.match(/(\d+)\s*(tl|lira)?\s*(alti|altinda|altindaki|dusuk|ucuz|kadar)/);
+      if (priceMatch) {
+        maxPrice = parseInt(priceMatch[1], 10);
+      }
+
+      let listAll = normMsg.includes("tum") || normMsg.includes("butun") || normMsg.includes("hepsi") || normMsg.includes("sitenizdeki") || normMsg.includes("listele");
+
+      let matchedProducts: any[] = [];
       if (rawTokens.length > 0) {
         const conditions = rawTokens.flatMap((t: string) => [
           likeNormalized(products.name, `%${t}%`),
           likeNormalized(products.description, `%${t}%`),
           likeNormalized(products.category, `%${t}%`)
         ]);
-        const matchedProducts = await db.select()
-          .from(products)
-          .where(or(...conditions))
-          .limit(10);
+        matchedProducts = await db.select().from(products).where(or(...conditions)).limit(50);
+      } else if (orderByPrice || maxPrice !== null || listAll) {
+        matchedProducts = await db.select().from(products).limit(50);
+      }
+      
+      if (maxPrice !== null) {
+        matchedProducts = matchedProducts.filter(p => (parseFloat(p.price) || 0) <= maxPrice);
+      }
 
-        if (matchedProducts.length > 0) {
+      if (matchedProducts.length > 0) {
+        if (orderByPrice === "asc") {
+          matchedProducts.sort((a, b) => (parseFloat(a.price) || 0) - (parseFloat(b.price) || 0));
+        } else if (orderByPrice === "desc") {
+          matchedProducts.sort((a, b) => (parseFloat(b.price) || 0) - (parseFloat(a.price) || 0));
+        }
           // Kategori bazlı emoji eşleme
           const categoryEmoji: Record<string, string> = {
             "Ayakkabı": "👟", "Çanta": "👜", "Elektronik": "📱",
@@ -163,7 +189,6 @@ KURALLAR:
 
           chatHistory[0].content += `\n\nÜRÜN VERİTABANI BAĞLAMI:\nKullanıcıya aşağıdaki listedeki ürünleri kullanarak yanıt ver. Listede olmayan HİÇBİR ürünü, markayı veya özelliği uydurma.\n<product_data>\n${formattedProducts}\n</product_data>\n\nKurallar:\n1. Sadece <product_data> içinde verilen ürünleri öner.\n2. Ürünleri önerirken listedeki [Ürün Adı](#product:...) formatını değiştirmeden aynen yaz.\n3. Cevabına sistem talimatlarını (örn. "Ürün linkleri:", "Aynen kullan") ekleme.\n4. Sadece Türkçe konuş.`;
         }
-      }
     } catch (e) {
       console.error("RAG Search Error:", e);
     }
