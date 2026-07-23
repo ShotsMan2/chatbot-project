@@ -18,6 +18,8 @@ export interface ChatInput {
   options?: {
     temperature?: number;
     num_ctx?: number;
+    top_p?: number;
+    top_k?: number;
   };
   tools?: any[];
   signal?: AbortSignal;

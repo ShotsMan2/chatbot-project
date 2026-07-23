@@ -121,13 +121,13 @@ KURALLAR:
 
     // --- RAG PRODUCT SEARCH (keyword extraction + direct SQL ilike) ---
     try {
-      const STOP_WORDS = new Set(["acaba","hangi","modelleriniz","modeller","neler","var","mi","mı","ne","bir","senin","sizin","bana","ben","isteyorum","istiyorum","ariyorum","arıyorum","göster","goster","ver","bak","bakiyorum","bakarim","soruyorum","sor","lütfen","lutfen","yardim","yardım","nasıl","nasil","kadar","kac","kaç","fiyat","nerede","bu","su","şu","ve","ile","o","ama","de","da","benim","sen","siz","onlar","biz","ya","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","merhaba","selam","nasılsın","nasilsin","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki"]);
+      const STOP_WORDS = new Set(["acaba","hangi","modelleriniz","modeller","neler","var","mi","mı","ne","bir","senin","sizin","bana","ben","isteyorum","istiyorum","ariyorum","arıyorum","göster","goster","ver","bak","bakiyorum","bakarim","soruyorum","sor","lütfen","lutfen","yardim","yardım","nasıl","nasil","kadar","kac","kaç","fiyat","nerede","bu","su","şu","ve","ile","o","ama","de","da","benim","sen","siz","onlar","biz","ya","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","merhaba","selam","nasılsın","nasilsin","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki","al","almak","alacagim","isterim","yok","mu","mü","gibi"]);
       const normalizeTurkish = (s: string) =>
         s.toLowerCase().replace(/[ç]/g,'c').replace(/[ğ]/g,'g').replace(/[ı]/g,'i')
          .replace(/[ö]/g,'o').replace(/[ş]/g,'s').replace(/[ü]/g,'u')
          .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
 
-      const rawTokens = normalizeTurkish(message).split(' ').filter((t: string) => t.length > 1 && !STOP_WORDS.has(t));
+      const rawTokens = normalizeTurkish(message).split(' ').filter((t: string) => t.length > 2 && !STOP_WORDS.has(t));
 
       if (rawTokens.length > 0) {
         const conditions = rawTokens.flatMap((t: string) => [
@@ -156,18 +156,12 @@ KURALLAR:
             return `[${p.name}](#product:${p.id}:${p.price}:${oldPrice}:${rating}:${emoji})`;
           };
 
-          const productLines = matchedProducts.slice(0, 5).map((p: any) =>
-            `${buildProductLink(p)}\n(Kategori: ${p.category || "Genel"}, Stok: ${p.stock > 0 ? p.stock + " adet" : "Stokta yok"})`
-          ).join("\n\n");
-
-          const prodList = matchedProducts.slice(0, 5).map((p: any) => {
+          const formattedProducts = matchedProducts.slice(0, 5).map((p: any) => {
             let desc = p.description ? ` - ${p.description.substring(0, 80).replace(/[\n\r]/g, ' ')}` : "";
-            return `- ${p.name} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})${desc}`;
+            return `- ${buildProductLink(p)} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})${desc}`;
           }).join("\n");
 
-          const allLinks = matchedProducts.slice(0, 5).map((p: any) => buildProductLink(p)).join(" ");
-
-          chatHistory[0].content += `\n\nÜRÜN VERİTABANI BAĞLAMI:\nKullanıcıya aşağıdaki ürün bilgilerini kullanarak doğrudan yanıt ver.\n<product_data>\nMevcut ürünler:\n${prodList}\n\nÜrün Linkleri (Cevabında bu linkleri AYNEN kullan): ${allLinks}\n</product_data>\n\nKurallar:\n1. Kullanıcının sorusu listedeki ürünlerle ilgiliyse o ürünün bilgisini ver.\n2. Veride olmayan bilgiyi (renk, beden, materyal vb) uydurma.\n3. Ürün linkini yazarken [ÜrünAdı](#product:...) formatında yaz, ] ile ( arasında BOŞLUK bırakma.\n4. Sadece Türkçe dilini, Latin alfabesini ve Türkçe karakterleri kullan.`;
+          chatHistory[0].content += `\n\nÜRÜN VERİTABANI BAĞLAMI:\nKullanıcıya aşağıdaki listedeki ürünleri kullanarak yanıt ver. Listede olmayan HİÇBİR ürünü, markayı veya özelliği uydurma.\n<product_data>\n${formattedProducts}\n</product_data>\n\nKurallar:\n1. Sadece <product_data> içinde verilen ürünleri öner.\n2. Ürünleri önerirken listedeki [Ürün Adı](#product:...) formatını değiştirmeden aynen yaz.\n3. Cevabına sistem talimatlarını (örn. "Ürün linkleri:", "Aynen kullan") ekleme.\n4. Sadece Türkçe konuş.`;
         }
       }
     } catch (e) {
@@ -204,6 +198,11 @@ KURALLAR:
     const ollamaStream = await ollamaClient.chat({
       model,
       messages: chatHistory,
+      options: {
+        temperature: 0.0,
+        top_p: 0.1,
+        top_k: 10
+      },
       signal: ollamaAbort.signal,
     });
 

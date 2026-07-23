@@ -209,8 +209,8 @@ export async function POST(req: NextRequest) {
          .replace(/ğ/g, 'g').replace(/Ğ/g, 'g')
          .trim().toLowerCase();
       const kw = normalizeTurkish(lastMsg);
-      const stopWords = new Set(["ne","kadar","kac","kaç","fiyat","ne kadar","nerede","nasil","nasıl","kac para","kaç para","var mi","var mı","göster","goster","bul","ara","acaba","lütfen","lutfen","istiyorum","bana","ben","bu","su","şu","ve","ile","bir","o","ama","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","nasılsın","nasilsin","merhaba","selam","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki"]);
-      const tokens = kw.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t));
+      const stopWords = new Set(["ne","kadar","kac","kaç","fiyat","ne kadar","nerede","nasil","nasıl","kac para","kaç para","var mi","var mı","göster","goster","bul","ara","acaba","lütfen","lutfen","istiyorum","bana","ben","bu","su","şu","ve","ile","bir","o","ama","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","nasılsın","nasilsin","merhaba","selam","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki","al","almak","alacagim","isterim","yok","mu","mü","gibi"]);
+      const tokens = kw.split(/\s+/).filter((t: string) => t.length > 2 && !stopWords.has(t));
       if (tokens.length > 0) {
         const conditions = tokens.flatMap((t: string) => [
           likeNormalized(products.name, `%${t}%`),
@@ -249,7 +249,12 @@ export async function POST(req: NextRequest) {
               const stream = await ollamaClient.chat({
                 model,
                 messages: runMessages,
-                options: { temperature, num_ctx: contextSize },
+                options: { 
+                  temperature: temperature ?? 0.0, 
+                  top_p: 0.1, 
+                  top_k: 10,
+                  num_ctx: contextSize 
+                },
                 tools: TOOLS,
                 signal: ollamaAbort.signal,
               });
