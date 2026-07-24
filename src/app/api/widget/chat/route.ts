@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const settings = await getSettings();
-    let model = requestedModel || settings?.defaultModel || "qwen2.5-coder:latest";
+    let model = requestedModel || settings?.defaultModel || "qwen2.5:7b";
 
     // Verify model exists, fallback to first available if it doesn't
     const availableModels = await ollamaClient.listModels();
@@ -135,7 +135,7 @@ KURALLAR:
         orderByPrice = "desc";
       }
 
-      const rawTokens = normMsg.split(' ').filter((t: string) => t.length > 2 && !STOP_WORDS.has(t) && !["ucuz", "pahali", "yuksek", "dusuk", "fiyati", "uygun", "urununuz", "urun", "urunler", "tl", "altindaki", "altinda", "alti", "kadar", "lira", "tum", "butun", "hepsi", "sitenizdeki", "listele"].includes(t) && isNaN(Number(t)));
+      const rawTokens = normMsg.split(' ').filter((t: string) => t.length > 2 && !STOP_WORDS.has(t) && !["ucuz", "pahali", "yuksek", "dusuk", "fiyati", "uygun", "urununuz", "urun", "urunler", "urunleri", "tl", "altindaki", "altinda", "alti", "kadar", "lira", "tum", "butun", "hepsi", "sitenizdeki", "listele"].includes(t) && isNaN(Number(t)));
 
       let maxPrice: number | null = null;
       const priceMatch = normMsg.match(/(\d+)\s*(tl|lira)?\s*(alti|altinda|altindaki|dusuk|ucuz|kadar)/);
@@ -153,7 +153,10 @@ KURALLAR:
           likeNormalized(products.category, `%${t}%`)
         ]);
         matchedProducts = await db.select().from(products).where(or(...conditions)).limit(50);
-      } else if (orderByPrice || maxPrice !== null || listAll) {
+      }
+      
+      // Fallback: keyword search returned nothing but we have maxPrice or listAll → get all products
+      if (matchedProducts.length === 0 && (maxPrice !== null || listAll || orderByPrice !== null)) {
         matchedProducts = await db.select().from(products).limit(50);
       }
       

@@ -5,6 +5,8 @@ import { conversations, messages, settings } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+const CURRENT_DEFAULT_MODEL = "qwen2.5:7b";
+
 export async function getConversations() {
   return await db.select().from(conversations).orderBy(desc(conversations.updatedAt));
 }
@@ -35,6 +37,11 @@ export async function getSettings() {
   if (!setting) {
     await db.insert(settings).values({ id: 1 }).onConflictDoNothing().execute();
     setting = await db.select().from(settings).where(eq(settings.id, 1)).limit(1).then((res) => res[0]);
+  }
+  // Sync default model if it's stale
+  if (setting && setting.defaultModel !== CURRENT_DEFAULT_MODEL) {
+    await db.update(settings).set({ defaultModel: CURRENT_DEFAULT_MODEL }).where(eq(settings.id, 1));
+    setting.defaultModel = CURRENT_DEFAULT_MODEL;
   }
   return setting!;
 }

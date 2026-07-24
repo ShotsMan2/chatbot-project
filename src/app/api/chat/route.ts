@@ -151,7 +151,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request", details: result.error.format() }, { status: 400 });
     }
 
-    const { model, messages: chatMessages, conversationId, temperature, contextSize } = result.data;
+    const { model: requestedModel, messages: chatMessages, conversationId, temperature, contextSize } = result.data;
+    
+    // Validate model exists, fall back to first available
+    let model = requestedModel;
+    try {
+      const availableModels = await ollamaClient.listModels();
+      const hasModel = availableModels.some((m: any) => m.name === model || m.name === `${model}:latest`);
+      if (!hasModel && availableModels.length > 0) {
+        model = availableModels[0].name;
+      }
+    } catch { /* ignore, use requested model */ }
+
     const lastUserMessage = chatMessages[chatMessages.length - 1];
 
     let convId = conversationId;
@@ -194,8 +205,60 @@ export async function POST(req: NextRequest) {
       const onClientAbort = () => ollamaAbort.abort();
       req.signal.addEventListener("abort", onClientAbort, { once: true });
 
+      let systemPrompt = ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT;
+      let hasRagData = false;
+
+      // --- PRE-SEARCH RAG: DB'den ürünleri önceden getirip prompt'a enjekte et ---
+      try {
+        const userText = lastUserMessage.content;
+        let maxPrice: number | null = null;
+        const priceMatch = userText.match(/(\d+)\s*(?:tl|lira)/i);
+        if (priceMatch) {
+          maxPrice = parseInt(priceMatch[1], 10);
+        }
+
+        let cleanText = userText.toLowerCase()
+          .replace(/[ç]/g, 'c').replace(/[ğ]/g, 'g').replace(/[ı]/g, 'i')
+          .replace(/[ö]/g, 'o').replace(/[ş]/g, 's').replace(/[ü]/g, 'u');
+
+        const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "nerede", "nasil", "nasıl", "para", "var", "mi", "mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben", "tl", "altindaki", "altinda", "alti", "ucuz", "dusuk", "uygun", "tum", "tüm", "butun", "bütün", "hepsi", "urunler", "ürünler", "urunleri", "urun", "ürün", "sitenizdeki", "listele", "hepsini", "bir", "ve", "ile", "icin", "için"]);
+        const tokens = cleanText.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t) && isNaN(Number(t)));
+
+        let ragProducts: any[] = [];
+
+        if (tokens.length > 0) {
+          const tokenConditions = tokens.map((t: string) =>
+            or(
+              likeNormalized(products.name, `%${t}%`),
+              likeNormalized(products.description, `%${t}%`),
+              likeNormalized(products.category, `%${t}%`)
+            )
+          );
+          ragProducts = await db.select().from(products).where(and(...tokenConditions)).limit(50);
+        }
+
+        if (ragProducts.length === 0 && maxPrice !== null) {
+          ragProducts = await db.select().from(products).limit(50);
+        }
+
+        if (maxPrice !== null) {
+          ragProducts = ragProducts.filter(p => (parseFloat(p.price) || 0) <= maxPrice);
+        }
+
+        if (ragProducts.length > 0) {
+          hasRagData = true;
+          const productContext = ragProducts.slice(0, 10).map(p =>
+            `- ${p.name} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})`
+          ).join("\n");
+
+          systemPrompt = `Sen "LocalMind E-Ticaret" mağazasının yapay zeka asistanısın. Sana verilen <product_data> içindeki ürünleri kullanarak yanıt vereceksin. Kullanıcının talebi ne olursa olsun (doğum günü hediyesi, hediye, özel gün vs.), SADECE listedeki ürünleri önerebilirsin.\n\n<product_data>\n${productContext}\n</product_data>\n\nKURALLAR (Kesinlikle uy):\n1. Sadece yukarıdaki ürünleri öner, ASLA kendin ürün uydurma.\n2. Kullanıcının bütçesine, isteğine en uygun ürünü/ürünleri listeden seç.\n3. ASLA search_products ÇAĞIRMA. Sana verilen ürünler yeterli.\n4. İade/değişim: 14 gün içinde yapılabilir, destek@demoshop.com.\n5. Sadece Türkçe konuş, Latin alfabesi kullan.`;
+        }
+      } catch (e) {
+        console.error("[Chat API] Pre-search RAG error:", e);
+      }
+
       const messagesWithSystem = [
-        { role: "system", content: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         ...chatMessages.filter((m: any) => m.role !== "system")
       ] as import("@/lib/ollama/ollama-types").ChatMessage[];
 
@@ -210,20 +273,21 @@ export async function POST(req: NextRequest) {
             let completionTokens = 0;
             const decoder = new TextDecoder();
 
+            const activeTools = hasRagData
+              ? TOOLS.filter(t => t.function.name !== "search_products" && t.function.name !== "recommend_similar_products" && t.function.name !== "get_flash_sales")
+              : TOOLS;
+
             while (isToolCalling) {
               const stream = await ollamaClient.chat({
                 model,
                 messages: runMessages,
                 options: { 
-                  temperature: temperature ?? 0.7, 
-                  top_p: 0.9, 
-                  top_k: 40,
+                  temperature: hasRagData ? 0 : (temperature ?? 0.7), 
+                  top_p: hasRagData ? 0.1 : 0.9, 
+                  top_k: hasRagData ? 10 : 40,
                   num_ctx: contextSize,
-                  // repeat_penalty: 1.2,
-                  // presence_penalty: 0.1,
-                  // frequency_penalty: 0.1
                 },
-                tools: TOOLS,
+                tools: activeTools,
                 signal: ollamaAbort.signal,
               });
 
@@ -283,7 +347,7 @@ export async function POST(req: NextRequest) {
                       const args = parseArgs(tc.function.arguments);
                       const keyword = args.keyword || "";
                       const maxPrice = args.maxPrice;
-                      const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "nerede", "nasil", "nasıl", "para", "var", "mi", "mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben", "tl", "altindaki", "altinda", "alti", "ucuz", "dusuk", "uygun", "tum", "tüm", "butun", "bütün", "hepsi", "urunler", "ürünler", "urun", "ürün", "sitenizdeki", "listele", "hepsini"]);
+                                            const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "nerede", "nasil", "nasıl", "para", "var", "mi", "mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben", "tl", "altindaki", "altinda", "alti", "ucuz", "dusuk", "uygun", "tum", "tüm", "butun", "bütün", "hepsi", "urunler", "ürünler", "urunleri", "urun", "ürün", "sitenizdeki", "listele", "hepsini"]);
                       let cleanKeyword = keyword.replace(/['"._?!]/g, ' ').trim().toLowerCase();
                       cleanKeyword = cleanKeyword
                         .replace(/[ç]/g, 'c').replace(/[ğ]/g, 'g').replace(/[ı]/g, 'i')
