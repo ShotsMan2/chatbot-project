@@ -25,7 +25,7 @@ export const messages = pgTable("messages", {
 
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
-  defaultModel: text("default_model").notNull().default("qwen3.5:4b"),
+  defaultModel: text("default_model").notNull().default("qwen2.5:7b"),
   defaultSystemPrompt: text("default_system_prompt").notNull().default("You are a helpful AI assistant."),
   temperature: real("temperature").notNull().default(0.7),
   contextSize: integer("context_size").notNull().default(4096),

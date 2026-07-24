@@ -39,7 +39,7 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
     <ChatContainer
       initialMessages={initialMessages}
       conversationId={conversationId}
-      defaultModel={conversation.model || settings.defaultModel}
+      defaultModel={models.some(m => m.name === conversation.model || m.name === `${conversation.model}:latest`) ? conversation.model : settings.defaultModel}
       models={models}
       ollamaStatus={ollamaStatus}
     />

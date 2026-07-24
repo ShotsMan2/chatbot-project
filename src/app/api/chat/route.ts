@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { conversations, messages, products, carts, cartItems, coupons, orders, faqs, reviews, supportTickets, flashSales } from "@/lib/db/schema";
 import { ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT } from "@/lib/prompts";
 import { ModelNotFoundError, OllamaConnectionError } from "@/lib/ollama/ollama-errors";
-import { eq, ilike, or, sql } from "drizzle-orm";
+import { eq, ilike, or, and, sql } from "drizzle-orm";
 
 // SQL'de Türkçe karakterleri normalize eden helper (ı,ğ,ü,ş,ö,ç → i,g,u,s,o,c)
 function likeNormalized(col: any, pattern: string) {
@@ -18,10 +18,13 @@ const TOOLS = [
     type: "function",
     function: {
       name: "search_products",
-      description: "Veritabanında ürün ara (örn: çanta, ayakkabı)",
+      description: "Veritabanında ürün ara (örn: çanta, ayakkabı, fiyat araması için maxPrice kullanın)",
       parameters: {
         type: "object",
-        properties: { keyword: { type: "string", description: "Aranacak kelime" } },
+        properties: { 
+          keyword: { type: "string", description: "Aranacak kelime (Genel liste için 'hepsi' yazın)" },
+          maxPrice: { type: "number", description: "Maksimum fiyat (isteğe bağlı, örn: 1000)" }
+        },
         required: ["keyword"]
       }
     }
@@ -148,7 +151,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request", details: result.error.format() }, { status: 400 });
     }
 
-    const { model, messages: chatMessages, conversationId, temperature, contextSize } = result.data;
+    const { model: requestedModel, messages: chatMessages, conversationId, temperature, contextSize } = result.data;
+    
+    // Validate model exists, fall back to first available
+    let model = requestedModel;
+    try {
+      const availableModels = await ollamaClient.listModels();
+      const hasModel = availableModels.some((m: any) => m.name === model || m.name === `${model}:latest`);
+      if (!hasModel && availableModels.length > 0) {
+        model = availableModels[0].name;
+      }
+    } catch { /* ignore, use requested model */ }
+
     const lastUserMessage = chatMessages[chatMessages.length - 1];
 
     let convId = conversationId;
@@ -191,48 +205,62 @@ export async function POST(req: NextRequest) {
       const onClientAbort = () => ollamaAbort.abort();
       req.signal.addEventListener("abort", onClientAbort, { once: true });
 
+      let systemPrompt = ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT;
+      let hasRagData = false;
+
+      // --- PRE-SEARCH RAG: DB'den ürünleri önceden getirip prompt'a enjekte et ---
+      try {
+        const userText = lastUserMessage.content;
+        let maxPrice: number | null = null;
+        const priceMatch = userText.match(/(\d+)\s*(?:tl|lira)/i);
+        if (priceMatch) {
+          maxPrice = parseInt(priceMatch[1], 10);
+        }
+
+        let cleanText = userText.toLowerCase()
+          .replace(/[ç]/g, 'c').replace(/[ğ]/g, 'g').replace(/[ı]/g, 'i')
+          .replace(/[ö]/g, 'o').replace(/[ş]/g, 's').replace(/[ü]/g, 'u');
+
+        const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "nerede", "nasil", "nasıl", "para", "var", "mi", "mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben", "tl", "altindaki", "altinda", "alti", "ucuz", "dusuk", "uygun", "tum", "tüm", "butun", "bütün", "hepsi", "urunler", "ürünler", "urunleri", "urun", "ürün", "sitenizdeki", "listele", "hepsini", "bir", "ve", "ile", "icin", "için"]);
+        const tokens = cleanText.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t) && isNaN(Number(t)));
+
+        let ragProducts: any[] = [];
+
+        if (tokens.length > 0) {
+          const tokenConditions = tokens.map((t: string) =>
+            or(
+              likeNormalized(products.name, `%${t}%`),
+              likeNormalized(products.description, `%${t}%`),
+              likeNormalized(products.category, `%${t}%`)
+            )
+          );
+          ragProducts = await db.select().from(products).where(and(...tokenConditions)).limit(50);
+        }
+
+        if (ragProducts.length === 0 && maxPrice !== null) {
+          ragProducts = await db.select().from(products).limit(50);
+        }
+
+        if (maxPrice !== null) {
+          ragProducts = ragProducts.filter(p => (parseFloat(p.price) || 0) <= maxPrice);
+        }
+
+        if (ragProducts.length > 0) {
+          hasRagData = true;
+          const productContext = ragProducts.slice(0, 10).map(p =>
+            `- ${p.name} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})`
+          ).join("\n");
+
+          systemPrompt = `Sen "LocalMind E-Ticaret" mağazasının yapay zeka asistanısın. Sana verilen <product_data> içindeki ürünleri kullanarak yanıt vereceksin. Kullanıcının talebi ne olursa olsun (doğum günü hediyesi, hediye, özel gün vs.), SADECE listedeki ürünleri önerebilirsin.\n\n<product_data>\n${productContext}\n</product_data>\n\nKURALLAR (Kesinlikle uy):\n1. Sadece yukarıdaki ürünleri öner, ASLA kendin ürün uydurma.\n2. Kullanıcının bütçesine, isteğine en uygun ürünü/ürünleri listeden seç.\n3. ASLA search_products ÇAĞIRMA. Sana verilen ürünler yeterli.\n4. İade/değişim: 14 gün içinde yapılabilir, destek@demoshop.com.\n5. Sadece Türkçe konuş, Latin alfabesi kullan.`;
+        }
+      } catch (e) {
+        console.error("[Chat API] Pre-search RAG error:", e);
+      }
+
       const messagesWithSystem = [
-        { role: "system", content: ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         ...chatMessages.filter((m: any) => m.role !== "system")
       ] as import("@/lib/ollama/ollama-types").ChatMessage[];
-
-      // Pre-search RAG: Her mesajda normalize edilmiş tokenlarla veritabanında ürün ara
-      const lastMsg = lastUserMessage?.content || "";
-      let preSearchedProducts: any[] = [];
-      const normalizeTurkish = (s: string) =>
-        s.replace(/['"._\-/\\()\[\]{}]/g, '')
-         .replace(/ı/g, 'i').replace(/İ/g, 'i')
-         .replace(/ü/g, 'u').replace(/Ü/g, 'u')
-         .replace(/ö/g, 'o').replace(/Ö/g, 'o')
-         .replace(/ç/g, 'c').replace(/Ç/g, 'c')
-         .replace(/ş/g, 's').replace(/Ş/g, 's')
-         .replace(/ğ/g, 'g').replace(/Ğ/g, 'g')
-         .trim().toLowerCase();
-      const kw = normalizeTurkish(lastMsg);
-      const stopWords = new Set(["ne","kadar","kac","kaç","fiyat","ne kadar","nerede","nasil","nasıl","kac para","kaç para","var mi","var mı","göster","goster","bul","ara","acaba","lütfen","lutfen","istiyorum","bana","ben","bu","su","şu","ve","ile","bir","o","ama","veya","ki","daha","en","çok","az","hem","hiç","hic","icin","için","üzere","uzere","sonra","önce","once","nasılsın","nasilsin","merhaba","selam","iyiyim","teşekkür","tesekkur","sağol","sagol","tamam","ok","olur","hayır","hayir","evet","belki","al","almak","alacagim","isterim","yok","mu","mü","gibi"]);
-      const tokens = kw.split(/\s+/).filter((t: string) => t.length > 2 && !stopWords.has(t));
-      if (tokens.length > 0) {
-        const conditions = tokens.flatMap((t: string) => [
-          likeNormalized(products.name, `%${t}%`),
-          likeNormalized(products.description, `%${t}%`),
-          likeNormalized(products.category, `%${t}%`)
-        ]);
-        preSearchedProducts = (await db.select()
-          .from(products)
-          .where(or(...conditions))
-          .limit(5)
-        ).map(p => ({
-          id: p.id, name: p.name, description: p.description,
-          price: p.price, stock: p.stock, imageUrl: p.imageUrl, category: p.category
-        }));
-        if (preSearchedProducts.length > 0) {
-          const productXml = preSearchedProducts.map(p => 
-            `- İsim: ${p.name}\n  Fiyat: ${p.price}\n  Stok: ${p.stock}\n  Kategori: ${p.category}\n  Açıklama: ${p.description?.substring(0, 150)}...`
-          ).join("\n\n");
-          
-          messagesWithSystem[0].content += `\n\nKULLANICININ ARADIĞI ÜRÜNLER (RAG SONUÇLARI):\nAşağıdaki <product_data> etiketleri arasındaki bilgileri kullanarak cevap ver.\n<product_data>\n${productXml}\n</product_data>`;
-        }
-      }
 
       const wrappedStream = new ReadableStream({
         async start(controller) {
@@ -245,17 +273,21 @@ export async function POST(req: NextRequest) {
             let completionTokens = 0;
             const decoder = new TextDecoder();
 
+            const activeTools = hasRagData
+              ? TOOLS.filter(t => t.function.name !== "search_products" && t.function.name !== "recommend_similar_products" && t.function.name !== "get_flash_sales")
+              : TOOLS;
+
             while (isToolCalling) {
               const stream = await ollamaClient.chat({
                 model,
                 messages: runMessages,
                 options: { 
-                  temperature: temperature ?? 0.0, 
-                  top_p: 0.1, 
-                  top_k: 10,
-                  num_ctx: contextSize 
+                  temperature: hasRagData ? 0 : (temperature ?? 0.7), 
+                  top_p: hasRagData ? 0.1 : 0.9, 
+                  top_k: hasRagData ? 10 : 40,
+                  num_ctx: contextSize,
                 },
-                tools: TOOLS,
+                tools: activeTools,
                 signal: ollamaAbort.signal,
               });
 
@@ -314,34 +346,50 @@ export async function POST(req: NextRequest) {
                     if (tc.function.name === "search_products") {
                       const args = parseArgs(tc.function.arguments);
                       const keyword = args.keyword || "";
-                      const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "ne kadar", "ne kadar", "nerede", "nasil", "nasıl", "kac para", "kaç para", "var mi", "var mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben"]);
+                      const maxPrice = args.maxPrice;
+                                            const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "nerede", "nasil", "nasıl", "para", "var", "mi", "mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben", "tl", "altindaki", "altinda", "alti", "ucuz", "dusuk", "uygun", "tum", "tüm", "butun", "bütün", "hepsi", "urunler", "ürünler", "urunleri", "urun", "ürün", "sitenizdeki", "listele", "hepsini"]);
                       let cleanKeyword = keyword.replace(/['"._?!]/g, ' ').trim().toLowerCase();
                       cleanKeyword = cleanKeyword
                         .replace(/[ç]/g, 'c').replace(/[ğ]/g, 'g').replace(/[ı]/g, 'i')
                         .replace(/[ö]/g, 'o').replace(/[ş]/g, 's').replace(/[ü]/g, 'u');
-                      const tokens = cleanKeyword.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t));
+                      const tokens = cleanKeyword.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t) && isNaN(Number(t)));
                       let productsData: any[] = [];
                       
+                       let searchResults = [];
                        if (tokens.length > 0) {
-                         const conditions = tokens.flatMap((t: string) => [
-                           likeNormalized(products.name, `%${t}%`),
-                           likeNormalized(products.description, `%${t}%`),
-                           likeNormalized(products.category, `%${t}%`)
-                         ]);
-                         const searchResults = await db.select()
+                         const tokenConditions = tokens.map((t: string) => 
+                           or(
+                             likeNormalized(products.name, `%${t}%`),
+                             likeNormalized(products.description, `%${t}%`),
+                             likeNormalized(products.category, `%${t}%`)
+                           )
+                         );
+                         searchResults = await db.select()
                            .from(products)
-                           .where(or(...conditions))
-                           .limit(10);
-                        productsData = searchResults.map(p => ({
-                          id: p.id,
-                          name: p.name,
-                          description: p.description,
-                          price: p.price,
-                          stock: p.stock,
-                          imageUrl: p.imageUrl,
-                          category: p.category
-                        }));
-                      }
+                           .where(and(...tokenConditions))
+                           .limit(50);
+                       } else {
+                         searchResults = await db.select().from(products).limit(50);
+                       }
+                       
+                       if (maxPrice !== undefined && maxPrice !== null) {
+                         searchResults = searchResults.filter(p => {
+                           const priceNum = parseFloat(p.price.replace(/[^0-9.]/g, ''));
+                           return priceNum <= maxPrice;
+                         });
+                       }
+                       
+                       searchResults = searchResults.slice(0, 10);
+                       
+                       productsData = searchResults.map(p => ({
+                         id: p.id,
+                         name: p.name,
+                         description: p.description,
+                         price: p.price,
+                         stock: p.stock,
+                         imageUrl: p.imageUrl,
+                         category: p.category
+                       }));
 
                       runMessages.push({
                         role: "tool",
