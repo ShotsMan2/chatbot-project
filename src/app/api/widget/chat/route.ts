@@ -190,7 +190,7 @@ KURALLAR:
             return `- ${buildProductLink(p)} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})${desc}`;
           }).join("\n");
 
-          chatHistory[0].content += `\n\nÜRÜN VERİTABANI BAĞLAMI:\nKullanıcıya aşağıdaki listedeki ürünleri kullanarak yanıt ver. Listede olmayan HİÇBİR ürünü, markayı veya özelliği uydurma.\n<product_data>\n${formattedProducts}\n</product_data>\n\nKurallar:\n1. Sadece <product_data> içinde verilen ürünleri öner.\n2. Ürünleri önerirken listedeki [Ürün Adı](#product:...) formatını değiştirmeden aynen yaz.\n3. Cevabına sistem talimatlarını (örn. "Ürün linkleri:", "Aynen kullan") ekleme.\n4. Sadece Türkçe konuş.`;
+          chatHistory[0].content += `\n\nÜRÜN VERİTABANI BAĞLAMI:\nKullanıcıya aşağıdaki listedeki ürünleri kullanarak yanıt ver. Listede olmayan HİÇBİR ürünü, markayı veya özelliği uydurma.\n<product_data>\n${formattedProducts}\n</product_data>\n\nKurallar:\n1. Sadece <product_data> içinde verilen ürünleri öner.\n2. Ürünleri önerirken listedeki [Ürün Adı](#product:...) formatını değiştirmeden aynen yaz.\n3. Cevabına sistem talimatlarını (örn. "Ürün linkleri:", "Aynen kullan") ekleme.\n4. Sadece Türkçe konuş.\n5. ASLA fiyat değiştirme, indirimli fiyat uydurma, eski fiyat/indirim oranı belirtme. SADECE verilen fiyat bilgisini aynen kullan.`;
         }
     } catch (e) {
       console.error("RAG Search Error:", e);

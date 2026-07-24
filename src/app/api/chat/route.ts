@@ -207,6 +207,7 @@ export async function POST(req: NextRequest) {
 
       let systemPrompt = ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT;
       let hasRagData = false;
+      let isDiscountQuery = false;
 
       // --- PRE-SEARCH RAG: DB'den ürünleri önceden getirip prompt'a enjekte et ---
       try {
@@ -218,40 +219,75 @@ export async function POST(req: NextRequest) {
         }
 
         let cleanText = userText.toLowerCase()
+          .normalize('NFC')
+          .replace(/i\u0307/g, 'i')
           .replace(/[ç]/g, 'c').replace(/[ğ]/g, 'g').replace(/[ı]/g, 'i')
-          .replace(/[ö]/g, 'o').replace(/[ş]/g, 's').replace(/[ü]/g, 'u');
+          .replace(/[ö]/g, 'o').replace(/[ş]/g, 's').replace(/[ü]/g, 'u')
+          .replace(/[?.,!;:'"(){}[\]<>]/g, '');
 
         const stopWords = new Set(["ne", "kadar", "kac", "kaç", "fiyat", "nerede", "nasil", "nasıl", "para", "var", "mi", "mı", "göster", "goster", "bul", "ara", "acaba", "lütfen", "lutfen", "istiyorum", "bana", "ben", "tl", "altindaki", "altinda", "alti", "ucuz", "dusuk", "uygun", "tum", "tüm", "butun", "bütün", "hepsi", "urunler", "ürünler", "urunleri", "urun", "ürün", "sitenizdeki", "listele", "hepsini", "bir", "ve", "ile", "icin", "için"]);
         const tokens = cleanText.split(/\s+/).filter((t: string) => t.length > 1 && !stopWords.has(t) && isNaN(Number(t)));
 
-        let ragProducts: any[] = [];
+        // Detect discount/indirim queries
+        const discountKeywords = ["indirim", "kampanya", "kampanyali", "indirimli", "flash", "firsat", "fırsat"];
+        isDiscountQuery = tokens.length > 0 && tokens.some((t: string) => discountKeywords.includes(t));
 
-        if (tokens.length > 0) {
-          const tokenConditions = tokens.map((t: string) =>
-            or(
-              likeNormalized(products.name, `%${t}%`),
-              likeNormalized(products.description, `%${t}%`),
-              likeNormalized(products.category, `%${t}%`)
-            )
-          );
-          ragProducts = await db.select().from(products).where(and(...tokenConditions)).limit(50);
+        // If discount query, fetch flash sales directly from DB
+        if (isDiscountQuery) {
+          const flashSalesData = await db.select({
+            id: products.id,
+            name: products.name,
+            description: products.description,
+            price: products.price,
+            discountPercent: flashSales.discountPercent,
+            stock: products.stock,
+            category: products.category
+          })
+          .from(flashSales)
+          .innerJoin(products, eq(flashSales.productId, products.id))
+          .where(eq(flashSales.isActive, 1));
+
+          if (flashSalesData.length > 0) {
+            hasRagData = true;
+            const productContext = flashSalesData.map(p =>
+              `- ${p.name} (Fiyat: ${p.price} TL, İndirim: %${p.discountPercent}, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})`
+            ).join("\n");
+
+            systemPrompt = ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT + `\n\nFLAŞ İNDİRİMDEKİ ÜRÜNLER:\n${productContext}\n\nEK KURALLAR:\n- SADECE yukarıdaki indirimli ürünleri listele. ASLA kendin ürün veya indirim uydurma.\n- ASLA fiyat değiştirme, yeni indirim oranı uydurma. SADECE verilen bilgileri aynen kullan.\n- İndirim oranı ve fiyat bilgilerini doğrudan aktar.\n- ASLA search_products, recommend_similar_products araçlarını çağırma.\n- İade/değişim: 14 gün içinde yapılabilir, destek@demoshop.com.\n- Sadece Türkçe konuş, Latin alfabesi kullan.`;
+          }
         }
 
-        if (ragProducts.length === 0 && maxPrice !== null) {
-          ragProducts = await db.select().from(products).limit(50);
-        }
+        // Fall through: not a discount query OR no flash sales found → regular product search
+        if (!hasRagData) {
+          let ragProducts: any[] = [];
 
-        if (maxPrice !== null) {
-          ragProducts = ragProducts.filter(p => (parseFloat(p.price) || 0) <= maxPrice);
-        }
+          if (tokens.length > 0) {
+            const tokenConditions = tokens.map((t: string) =>
+              or(
+                likeNormalized(products.name, `%${t}%`),
+                likeNormalized(products.description, `%${t}%`),
+                likeNormalized(products.category, `%${t}%`)
+              )
+            );
+            ragProducts = await db.select().from(products).where(and(...tokenConditions)).limit(50);
+          }
 
-        if (ragProducts.length > 0) {
-          hasRagData = true;
-          const productContext = ragProducts.slice(0, 10).map(p =>
-            `- ${p.name} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})`
-          ).join("\n");
+          if (ragProducts.length === 0 && maxPrice !== null) {
+            ragProducts = await db.select().from(products).limit(50);
+          }
 
-          systemPrompt = `Sen "LocalMind E-Ticaret" mağazasının yapay zeka asistanısın. Sana verilen <product_data> içindeki ürünleri kullanarak yanıt vereceksin. Kullanıcının talebi ne olursa olsun (doğum günü hediyesi, hediye, özel gün vs.), SADECE listedeki ürünleri önerebilirsin.\n\n<product_data>\n${productContext}\n</product_data>\n\nKURALLAR (Kesinlikle uy):\n1. Sadece yukarıdaki ürünleri öner, ASLA kendin ürün uydurma.\n2. Kullanıcının bütçesine, isteğine en uygun ürünü/ürünleri listeden seç.\n3. ASLA search_products ÇAĞIRMA. Sana verilen ürünler yeterli.\n4. İade/değişim: 14 gün içinde yapılabilir, destek@demoshop.com.\n5. Sadece Türkçe konuş, Latin alfabesi kullan.`;
+          if (maxPrice !== null) {
+            ragProducts = ragProducts.filter(p => (parseFloat(p.price) || 0) <= maxPrice);
+          }
+
+          if (ragProducts.length > 0) {
+            hasRagData = true;
+            const productContext = ragProducts.slice(0, 10).map(p =>
+              `- ${p.name} (Fiyat: ${p.price} TL, Kategori: ${p.category || "Genel"}, Stok: ${p.stock})`
+            ).join("\n");
+
+            systemPrompt = ECOMMERCE_ORCHESTRATOR_SYSTEM_PROMPT + `\n\nÜRÜN VERİLERİ (SADECE bu ürünler hakkında konuş):\n${productContext}\n\nEK KURALLAR:\n- SADECE yukarıdaki listedeki ürünleri kullan. ASLA kendin ürün uydurma.\n- ASLA fiyat değiştirme, indirimli fiyat uydurma, eski fiyat/indirim oranı belirtme. SADECE verilen "Fiyat" değerini aynen kullan.\n- Kullanıcının bütçesine en uygun ürünü listeden seç.\n- ASLA search_products, recommend_similar_products, get_flash_sales araçlarını çağırma. Verilen ürünler yeterli.\n- İade/değişim: 14 gün içinde yapılabilir, destek@demoshop.com.\n- Sadece Türkçe konuş, Latin alfabesi kullan.`;
+          }
         }
       } catch (e) {
         console.error("[Chat API] Pre-search RAG error:", e);
@@ -274,7 +310,11 @@ export async function POST(req: NextRequest) {
             const decoder = new TextDecoder();
 
             const activeTools = hasRagData
-              ? TOOLS.filter(t => t.function.name !== "search_products" && t.function.name !== "recommend_similar_products" && t.function.name !== "get_flash_sales")
+              ? TOOLS.filter(t => {
+                  if (isDiscountQuery && t.function.name === "get_flash_sales") return true;
+                  if (isDiscountQuery && t.function.name === "search_products") return false;
+                  return t.function.name !== "search_products" && t.function.name !== "recommend_similar_products" && t.function.name !== "get_flash_sales";
+                })
               : TOOLS;
 
             while (isToolCalling) {
